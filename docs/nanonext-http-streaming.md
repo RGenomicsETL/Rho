@@ -5,6 +5,44 @@ This note turns [nanonext issue
 states what it gives Rho, and separates public NNG facilities from implementation
 details that should remain private to NNG.
 
+## Current status (4 September 2026)
+
+The shape below is a proposal. [Issue #329](https://github.com/r-lib/nanonext/issues/329)
+is still open, and upstream
+[`9d32d058`](https://github.com/r-lib/nanonext/commit/9d32d058ae03e7bc51d72e1f61a7694923c63b65)
+does not export `ncurl_stream()`. The RGenomicsETL fork has been rebased onto that
+commit, preserving its public interfaces. Its version is `1.10.2.9001`.
+
+The current fork has more API additions than the original HTTP prototype:
+
+| Surface | Current behavior and Rho dependency |
+|---|---|
+| `ncurl_session()` / `transact()` | Existing upstream reusable connection and complete transactions; unchanged by the fork. |
+| `ncurl_stream_aio()` | Cancellable HTTP opening returning `{status, headers, stream}`. |
+| `ncurl_stream_recv()` / `is_ncurl_stream()` | Separate HTTP stream receiving `{data, complete}`; used by the Rho HTTP body adapter. |
+| `stream_aio()` | Asynchronous ordinary-stream opening; used by Rho WebSockets. |
+| `as.promise.sendAio()` | Send completion through promises; used by Rho's Aio bridge. |
+
+The rebased fork also corrects three reproduced HTTP defects: it skips interim
+`100`/`103` responses until the final head, rejects unsupported transfer codings,
+and preserves a single deadline across opening phases and framing-only receive
+reads. It defensively rejects simultaneous `Transfer-Encoding` and
+`Content-Length`, and rejects protocol upgrades and successful CONNECT tunnels.
+These changes preserve the existing fork API; they do not implement the proposed
+ordinary-stream API. [Native changes and regression tests](https://github.com/RGenomicsETL/nanonext/commit/dac8e81c7).
+
+The pinned fork also retains HTTP server callback objects through deferred
+teardown. Without that retention, garbage collection between server close and
+the next event-loop iteration can reclaim connection pointers still used by
+cleanup. The regression covers explicit close and finalizer-driven close with
+two intervening garbage collections. This defect was reproduced on both the
+old fork and the rebased baseline. [Lifetime fix and regression test](https://github.com/RGenomicsETL/nanonext/commit/084c8eb82a35c38b2aaf7dd203414829c2bd8011).
+
+Repeated close is safe, but ordinary nanonext streams return an `errorValue`
+on a second close. Rho makes its own close operation idempotent. A future public
+API should state that distinction rather than promise repeated success by
+accident.
+
 ## Short answer
 
 The proposed synchronous response head is enough for Rho to consume SSE once a
@@ -19,6 +57,12 @@ the task does not make the call cancellable or move it to another process.
 
 The clean initial nanonext API is therefore useful, but Rho must describe it
 accurately and retain an HTTP implementation with asynchronous opening.
+
+Synchronous opening also prevents an HTTP server using callbacks in the same R
+process from producing its response head while the constructor is waiting.
+Those integration fixtures would need a separate server process. Moving only
+the constructor to a worker is insufficient: the worker must own the native
+connection and relay subsequent body bytes as well.
 
 ## 1. `ncurl_session()` already has a different job
 
@@ -269,12 +313,14 @@ The upstream implementation should cover:
 - the first SSE event while the server keeps the connection open, a later event,
   and clean completion.
 
-Two details in the fork deserve explicit tests during the rewrite. It currently
-accepts `chunked` anywhere in `Transfer-Encoding`
+Two defects in the historical prototype are now regression tests in the
+rebased fork. The prototype accepted `chunked` anywhere in `Transfer-Encoding`
 ([body selection](https://github.com/RGenomicsETL/nanonext/blob/cf24957d95ae7d48e1f0e06df75d1d02d197b56a/src/ncurl.c#L352-L384)),
-and it treats every `1xx` head as a bodyless completed response. Transfer coding
-order and interim response handling should be settled deliberately rather than
-inherited from the prototype.
+and treated every `1xx` head as a bodyless completed response. The current fork
+accepts only the single supported `chunked` coding and continues past interim
+heads until the final response. A public API rewrite must retain these fixes.
+This is not a full HTTP parser conformance claim: ignored chunk extensions do
+not yet receive complete syntax validation.
 
 ## 9. Questions for issue #329
 

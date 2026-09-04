@@ -15,14 +15,14 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Imports:
     S7, rho.async (>= 0.0.1.9001), rho.http (>= 0.0.1.9001),
-    rho.compute (>= 0.0.1.9001), nanonext (>= 1.10.1.9001), httr2, curl
+    rho.compute (>= 0.0.1.9001), nanonext (>= 1.10.2.9001), httr2, curl
 Suggests:
     tinytest, knitr, s7contract, mirai, later
 Remotes:
     RGenomicsETL/Rho/packages/rho.async,
     RGenomicsETL/Rho/packages/rho.http,
     RGenomicsETL/Rho/packages/rho.compute,
-    RGenomicsETL/nanonext@5302ac39732477aafbd042ab61e314d763220658
+    RGenomicsETL/nanonext@084c8eb82a35c38b2aaf7dd203414829c2bd8011
 URL: https://github.com/RGenomicsETL/Rho,
     https://rgenomicsetl.github.io/Rho/rho.http.httr2/
 BugReports: https://github.com/RGenomicsETL/Rho/issues

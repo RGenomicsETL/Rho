@@ -14,12 +14,12 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Imports:
     S7, s7contract, rho.async (>= 0.0.1.9001),
-    nanonext (>= 1.10.1.9001), yyjsonr
+    nanonext (>= 1.10.2.9001), yyjsonr
 Suggests:
     tinytest, knitr
 Remotes:
     RGenomicsETL/Rho/packages/rho.async,
-    RGenomicsETL/nanonext@5302ac39732477aafbd042ab61e314d763220658
+    RGenomicsETL/nanonext@084c8eb82a35c38b2aaf7dd203414829c2bd8011
 URL: https://github.com/RGenomicsETL/Rho,
     https://rgenomicsetl.github.io/Rho/rho.http/
 BugReports: https://github.com/RGenomicsETL/Rho/issues
