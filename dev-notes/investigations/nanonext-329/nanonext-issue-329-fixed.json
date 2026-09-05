@@ -1,0 +1,202 @@
+[
+  {
+    "case": "length_valid",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Content-Length": "3"
+    },
+    "stream_class": "ncurlStream",
+    "complete": true,
+    "repeated_eof": true,
+    "receive_seconds": 0,
+    "receives": 1,
+    "body_hex": "616263",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.021
+  },
+  {
+    "case": "chunked_valid",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Transfer-Encoding": "chunked"
+    },
+    "stream_class": "ncurlStream",
+    "complete": true,
+    "repeated_eof": true,
+    "receive_seconds": 0,
+    "receives": 1,
+    "body_hex": "616263",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.031
+  },
+  {
+    "case": "interim_103",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Content-Length": "3"
+    },
+    "stream_class": "ncurlStream",
+    "complete": true,
+    "repeated_eof": true,
+    "receive_seconds": 0.001,
+    "receives": 1,
+    "body_hex": "616263",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.019
+  },
+  {
+    "case": "interim_100_103",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Content-Length": "3"
+    },
+    "stream_class": "ncurlStream",
+    "complete": true,
+    "repeated_eof": true,
+    "receive_seconds": 0.001,
+    "receives": 1,
+    "body_hex": "616263",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.02
+  },
+  {
+    "case": "te_chunked_gzip",
+    "version": "1.10.2.9001",
+    "open_error": 9,
+    "total_seconds": 0.032
+  },
+  {
+    "case": "te_gzip_chunked",
+    "version": "1.10.2.9001",
+    "open_error": 9,
+    "total_seconds": 0.025
+  },
+  {
+    "case": "te_gzip_only",
+    "version": "1.10.2.9001",
+    "open_error": 9,
+    "total_seconds": 0.017
+  },
+  {
+    "case": "te_chunked_duplicate",
+    "version": "1.10.2.9001",
+    "open_error": 9,
+    "total_seconds": 0.032
+  },
+  {
+    "case": "length_negative",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.013
+  },
+  {
+    "case": "length_nondecimal",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.017
+  },
+  {
+    "case": "length_conflicting_fields",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.018
+  },
+  {
+    "case": "length_conflicting_list",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.028
+  },
+  {
+    "case": "length_identical_fields",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.017
+  },
+  {
+    "case": "length_overflow",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.013
+  },
+  {
+    "case": "te_and_length",
+    "version": "1.10.2.9001",
+    "open_error": 13,
+    "total_seconds": 0.013
+  },
+  {
+    "case": "chunked_invalid_size",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Transfer-Encoding": "chunked"
+    },
+    "stream_class": "ncurlStream",
+    "receive_error": 13,
+    "receive_seconds": 0,
+    "receives": 1,
+    "body_hex": "",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.017
+  },
+  {
+    "case": "chunked_extension_valid",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Transfer-Encoding": "chunked"
+    },
+    "stream_class": "ncurlStream",
+    "complete": true,
+    "repeated_eof": true,
+    "receive_seconds": 0.001,
+    "receives": 1,
+    "body_hex": "616263",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.019
+  },
+  {
+    "case": "chunked_extension_invalid",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Transfer-Encoding": "chunked"
+    },
+    "stream_class": "ncurlStream",
+    "complete": true,
+    "repeated_eof": true,
+    "receive_seconds": 0,
+    "receives": 1,
+    "body_hex": "616263",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.023
+  },
+  {
+    "case": "slow_chunk_line",
+    "version": "1.10.2.9001",
+    "status": 200,
+    "headers": {
+      "Transfer-Encoding": "chunked"
+    },
+    "stream_class": "ncurlStream",
+    "receive_error": 5,
+    "receive_seconds": 0.101,
+    "receives": 1,
+    "body_hex": "",
+    "close_first": 0,
+    "close_second": 7,
+    "total_seconds": 0.115
+  }
+]

@@ -1,0 +1,5 @@
+{
+  "client_timeout_ms": 1234,
+  "request_default_ms": 30000,
+  "effective_payload_ms": 30000
+}
