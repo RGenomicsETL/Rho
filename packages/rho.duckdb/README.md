@@ -10,8 +10,11 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 [`rho.duckdb`](https://rgenomicsetl.github.io/Rho/rho.duckdb/)
 implements the database-neutral
 [`rho.bio`](https://rgenomicsetl.github.io/Rho/rho.bio/) SQL generics
-for DuckDB. Queries return tasks, and declared read-only paths are
-checked before execution.
+for DuckDB. Queries return tasks, but the current guard is only a
+first-token and forbidden-keyword check. It is **not safe for
+model-authored or otherwise untrusted SQL**; parser-backed statement and
+resource admission is tracked in [issue
+\#7](https://github.com/RGenomicsETL/Rho/issues/7).
 
 ## An asynchronous query
 
@@ -33,10 +36,11 @@ rows
 #> 2 BRCA1       8
 ```
 
-`rho_assert_readonly_sql()` rejects write, DDL, extension-loading, and
-attach statements on this path. The S7 connection class is the dispatch
-point, leaving room for other SQL backends without changing manifests or
-agent tools.
+`rho_check_readonly_sql()` rejects a small set of obvious write, DDL,
+extension-loading, and attach spellings. It does not establish
+one-statement, AST, relation, path, network, or effect safety. The S7
+connection class remains the dispatch point for a future parser-backed
+guard.
 
 See the [`rho.duckdb`
 reference](https://rgenomicsetl.github.io/Rho/rho.duckdb/reference/) and

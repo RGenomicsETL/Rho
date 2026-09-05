@@ -58,25 +58,30 @@ rho_schedule_tool_call <- function(
 ) {
   rho.async::rho_coro_task(
     function() {
+      fail <- function(tool_call, message) {
+        rho.async::rho_as_promise(rho_fail_tool_call(
+          agent,
+          tool_call,
+          message
+        ))
+      }
       coro::await(rho.async::rho_as_promise(
         rho_emit_agent_event(agent, rho_tool_execution_start_event(call))
       ))
       if (isTRUE(agent@state$cancelled)) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
+        failure <- coro::await(fail(
           call,
-          agent@state$cancel_reason %||% "Tool execution was cancelled"
-        )))
+          rho_agent_cancel_message(agent, "Tool execution was cancelled")
+        ))
         return(failure)
       }
 
       tool <- rho_agent_tool(agent, call@name)
       if (is.null(tool)) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
+        failure <- coro::await(fail(
           call,
           sprintf("Tool %s not found", call@name)
-        )))
+        ))
         return(failure)
       }
 
@@ -85,11 +90,7 @@ rho_schedule_tool_call <- function(
         error = function(error) error
       )
       if (inherits(args, "error")) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
-          call,
-          conditionMessage(args)
-        )))
+        failure <- coro::await(fail(call, conditionMessage(args)))
         return(failure)
       }
       if (S7::S7_inherits(args, rho.ai::ToolErrorResult)) {
@@ -132,19 +133,14 @@ rho_schedule_tool_call <- function(
         error = function(error) error
       )
       if (inherits(decision, "error")) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
-          call,
-          conditionMessage(decision)
-        )))
+        failure <- coro::await(fail(call, conditionMessage(decision)))
         return(failure)
       }
       if (!S7::S7_inherits(decision, RhoBeforeToolCallDecision)) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
+        failure <- coro::await(fail(
           call,
           "before-tool policy returned an invalid decision"
-        )))
+        ))
         return(failure)
       }
       if (decision@block) {
@@ -153,8 +149,13 @@ rho_schedule_tool_call <- function(
         } else {
           reason <- "Tool execution was blocked without a policy reason"
         }
-        failure <- coro::await(rho.async::rho_as_promise(
-          rho_fail_tool_call(agent, call, reason)
+        failure <- coro::await(fail(call, reason))
+        return(failure)
+      }
+      if (isTRUE(agent@state$cancelled)) {
+        failure <- coro::await(fail(
+          prepared_call,
+          rho_agent_cancel_message(agent, "Tool execution was cancelled")
         ))
         return(failure)
       }
@@ -170,13 +171,18 @@ rho_schedule_tool_call <- function(
         error = function(error) error
       )
       if (inherits(tool_task, "error")) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
-          prepared_call,
-          conditionMessage(tool_task)
-        )))
+        failure <- coro::await(fail(prepared_call, conditionMessage(tool_task)))
         return(failure)
       }
+      agent@state$active_tool_sequence <- agent@state$active_tool_sequence + 1L
+      active_id <- as.character(agent@state$active_tool_sequence)
+      agent@state$active_tool_tasks[[active_id]] <- tool_task
+      on.exit(
+        {
+          agent@state$active_tool_tasks[[active_id]] <- NULL
+        },
+        add = TRUE
+      )
 
       result <- tryCatch(
         coro::await(rho.async::rho_as_promise(tool_task)),
@@ -186,19 +192,18 @@ rho_schedule_tool_call <- function(
         coro::await(rho.async::rho_as_promise(update_task))
       }
       if (inherits(result, "error")) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
-          prepared_call,
-          conditionMessage(result)
-        )))
+        failure <- coro::await(fail(prepared_call, conditionMessage(result)))
+        return(failure)
+      }
+      if (S7::S7_inherits(result, rho.async::RhoCancellation)) {
+        failure <- coro::await(fail(prepared_call, result@message))
         return(failure)
       }
       if (!S7::S7_inherits(result, rho.ai::ToolResult)) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
+        failure <- coro::await(fail(
           prepared_call,
           "Tool did not return a ToolResult value"
-        )))
+        ))
         return(failure)
       }
 
@@ -216,19 +221,14 @@ rho_schedule_tool_call <- function(
         error = function(error) error
       )
       if (inherits(after, "error")) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
-          prepared_call,
-          conditionMessage(after)
-        )))
+        failure <- coro::await(fail(prepared_call, conditionMessage(after)))
         return(failure)
       }
       if (!S7::S7_inherits(after, RhoAfterToolCallDecision)) {
-        failure <- coro::await(rho.async::rho_as_promise(rho_fail_tool_call(
-          agent,
+        failure <- coro::await(fail(
           prepared_call,
           "after-tool policy returned an invalid decision"
-        )))
+        ))
         return(failure)
       }
       coro::await(rho.async::rho_as_promise(rho_finish_tool_call(

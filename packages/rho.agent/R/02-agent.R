@@ -232,6 +232,10 @@ rho_agent_error <- function(message, kind = "agent", retryable = FALSE, details 
   )
 }
 
+rho_agent_cancel_message <- function(agent, fallback) {
+  agent@state$cancel_reason %||% fallback
+}
+
 rho_session_journal_error <- function(message, details = list()) {
   RhoSessionJournalErrorValue(
     kind = "session_journal",
@@ -437,6 +441,8 @@ rho_agent <- function(
     follow_up_queue = list(),
     phase = RhoAgentIdle(),
     pending_tool_calls = character(),
+    active_tool_tasks = list(),
+    active_tool_sequence = 0L,
     events = list(),
     event_sequence = 0L,
     run_sequence = 0L,
@@ -550,6 +556,9 @@ S7::method(rho_abort_agent, RhoAgent) <- function(agent, reason = NULL, ...) {
   if (!is.null(agent@state$current_stream)) {
     rho.async::rho_stream_close(agent@state$current_stream)
   }
+  for (task in unname(agent@state$active_tool_tasks)) {
+    rho.async::rho_cancel(task, reason = agent@state$cancel_reason)
+  }
   rho.async::rho_task(NULL)
 }
 
@@ -584,6 +593,8 @@ S7::method(rho_reset, RhoAgent) <- function(agent, ...) {
       agent@state$steering_queue <- list()
       agent@state$follow_up_queue <- list()
       agent@state$pending_tool_calls <- character()
+      agent@state$active_tool_tasks <- list()
+      agent@state$active_tool_sequence <- 0L
       agent@state$cancelled <- FALSE
       agent@state$cancel_reason <- NULL
       NULL

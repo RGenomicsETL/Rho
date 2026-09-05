@@ -79,17 +79,7 @@ rho_openai_codex_credential_from_token <- function(document, source, refresh_tok
   access <- document$access_token
   refresh <- document$refresh_token %||% refresh_token
   expires_in <- suppressWarnings(as.double(document$expires_in))
-  if (
-    !is.character(access) ||
-      length(access) != 1L ||
-      !nzchar(access) ||
-      !is.character(refresh) ||
-      length(refresh) != 1L ||
-      !nzchar(refresh) ||
-      length(expires_in) != 1L ||
-      is.na(expires_in) ||
-      expires_in <= 0
-  ) {
+  if (!rho_valid_oauth_token_fields(access, refresh, expires_in)) {
     return(rho_auth_error(
       "OpenAI Codex token response is missing access_token, refresh_token, or expires_in",
       code = "response_fields"
@@ -195,12 +185,9 @@ rho_openai_codex_start_device_login <- function(auth) {
       }
       interval <- suppressWarnings(as.double(document$interval))
       if (
-        !is.character(document$device_auth_id) ||
-          !nzchar(document$device_auth_id) ||
-          !is.character(document$user_code) ||
-          !nzchar(document$user_code) ||
-          length(interval) != 1L ||
-          is.na(interval) ||
+        !rho_non_empty_scalar_string(document$device_auth_id) ||
+          !rho_non_empty_scalar_string(document$user_code) ||
+          !rho_scalar_number(interval) ||
           interval < 0
       ) {
         return(rho_auth_error(
@@ -239,10 +226,8 @@ rho_openai_codex_poll_device_login <- function(auth, device) {
               return(rho.async::rho_poll_failed(document))
             }
             if (
-              !is.character(document$authorization_code) ||
-                !nzchar(document$authorization_code) ||
-                !is.character(document$code_verifier) ||
-                !nzchar(document$code_verifier)
+              !rho_non_empty_scalar_string(document$authorization_code) ||
+                !rho_non_empty_scalar_string(document$code_verifier)
             ) {
               return(rho.async::rho_poll_failed(rho_auth_error(
                 "OpenAI Codex device authorization response is missing fields",

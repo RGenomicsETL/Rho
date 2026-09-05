@@ -264,16 +264,13 @@ rho_anthropic_oauth_token <- function(auth, fields, source, operation) {
         return(document)
       }
       expires_in <- suppressWarnings(as.double(document$expires_in))
-      valid <- is.character(document$access_token) &&
-        length(document$access_token) == 1L &&
-        nzchar(document$access_token) &&
-        is.character(document$refresh_token) &&
-        length(document$refresh_token) == 1L &&
-        nzchar(document$refresh_token) &&
-        length(expires_in) == 1L &&
-        !is.na(expires_in) &&
-        expires_in > 0
-      if (!valid) {
+      if (
+        !rho_valid_oauth_token_fields(
+          document$access_token,
+          document$refresh_token,
+          expires_in
+        )
+      ) {
         return(rho_auth_error(
           sprintf("Anthropic OAuth %s response is missing token fields", operation),
           code = "response_fields"

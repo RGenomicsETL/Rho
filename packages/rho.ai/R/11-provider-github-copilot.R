@@ -225,21 +225,14 @@ rho_github_copilot_start_device_login <- function(auth) {
       }
       interval <- suppressWarnings(as.double(document$interval %||% 5))
       expires <- suppressWarnings(as.double(document$expires_in))
-      trusted_uri <- is.character(document$verification_uri) &&
-        length(document$verification_uri) == 1L &&
+      trusted_uri <- rho_non_empty_scalar_string(document$verification_uri) &&
         grepl("^https://[^[:space:][:cntrl:]]+$", document$verification_uri)
-      valid <- is.character(document$device_code) &&
-        length(document$device_code) == 1L &&
-        nzchar(document$device_code) &&
-        is.character(document$user_code) &&
-        length(document$user_code) == 1L &&
-        nzchar(document$user_code) &&
+      valid <- rho_non_empty_scalar_string(document$device_code) &&
+        rho_non_empty_scalar_string(document$user_code) &&
         trusted_uri &&
-        length(interval) == 1L &&
-        !is.na(interval) &&
+        rho_scalar_number(interval) &&
         interval >= 0 &&
-        length(expires) == 1L &&
-        !is.na(expires) &&
+        rho_scalar_number(expires) &&
         expires > 0
       if (!valid) {
         return(rho_auth_error(
@@ -287,7 +280,7 @@ rho_github_copilot_poll_device_login <- function(auth, device) {
             return(rho.async::rho_poll_failed(document))
           }
           access_token <- document$access_token
-          if (is.character(access_token) && length(access_token) == 1L && nzchar(access_token)) {
+          if (rho_non_empty_scalar_string(access_token)) {
             return(rho.async::rho_poll_complete(access_token))
           }
           code <- as.character(document$error %||% "invalid_response")
@@ -350,12 +343,12 @@ rho_github_copilot_credential <- function(
   model_catalog_complete = FALSE,
   source = ""
 ) {
-  if (!is.character(session_token) || length(session_token) != 1L || !nzchar(session_token)) {
+  if (!rho_non_empty_scalar_string(session_token)) {
     rho.async::rho_signal_contract_violation(
       "`session_token` must be one non-empty string"
     )
   }
-  if (!is.character(github_token) || length(github_token) != 1L || !nzchar(github_token)) {
+  if (!rho_non_empty_scalar_string(github_token)) {
     rho.async::rho_signal_contract_violation(
       "`github_token` must be one non-empty string"
     )
@@ -427,10 +420,7 @@ S7::method(rho_credential_decode, GitHubCopilotOAuthAuth) <- function(
 rho_github_copilot_model_selectable <- function(value) {
   if (
     !is.list(value) ||
-      !is.character(value$id) ||
-      length(value$id) != 1L ||
-      is.na(value$id) ||
-      !nzchar(value$id)
+      !rho_non_empty_scalar_string(value$id)
   ) {
     return(FALSE)
   }

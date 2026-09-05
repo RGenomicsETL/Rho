@@ -3,11 +3,18 @@
 Rho has an acyclic package graph and asynchronous effects.
 
 ```text
-rho.async -> rho.http -> rho.ai -> rho.agent -> rho.ext -> rho.coding
+rho.async -> rho.http -> rho.ai -> rho.agent -> rho.coding
+rho.ai -> rho.ext -> rho.bio.agent
 rho.async -> rho.compute -> rho.graphics
 rho.http + rho.compute -> rho.http.httr2
-rho.async -> rho.bio -> rho.duckdb -> rho.bio.agent
+rho.compute -> rho.coding
+rho.async -> rho.bio -> rho.duckdb
 ```
+
+This is the current DESCRIPTION dependency graph. `rho.ext` is not yet bound to
+`rho.agent`, and `rho.bio.agent` does not yet consume `rho.duckdb`; that missing
+integration is tracked in [issue #9](https://github.com/RGenomicsETL/Rho/issues/9)
+rather than shown here as implemented architecture.
 
 The central rule is that effectful public APIs return `RhoTask` or `RhoStream`.
 Synchronous waiting is explicit through `rho.async::rho_await()` and test helpers.
@@ -225,11 +232,11 @@ rather than methods added in anticipation.
 The schema and extension rules are specified in the
 [Rho JSONL session schema](session-jsonl-schema.md).
 
-Rho's JSONL schema is not Pi's session JSONL schema. Pi's version-3 file carries
-a session header and an ID-linked tree. Rho carries semantic entries at
-committed linear positions. A Pi interoperability codec may translate these
-representations when session identity and lineage are part of the exercised Rho
-contract; the native codec does not silently erase either model's semantics.
+Rho's JSONL schema is not Pi's session JSONL schema. Both carry session identity
+and parent-linked entry trees, but Rho uses stable semantic record tags and
+explicit leaf-movement records under its own schema. A Pi interoperability codec
+may translate these representations; the native codec does not silently erase
+either model's lineage or selection semantics.
 
 Extensions consume the same session lifecycle. They may append typed custom
 entries or derive another representation from committed entries, a cursor, or
@@ -280,10 +287,11 @@ their package responsibilities, are recorded in
 
 ## Publication gate
 
-Development is public and remains experimental while provider and agent parity
-is incomplete. A tagged release follows only after the parity ledger is
-satisfied, every package installs and checks on supported platforms, live provider checks
-pass without stored credentials, generated documentation is current, and a
-secret scan is clean. The public repository can then be added to
-`RGenomicsETL/rgenomicsetl.r-universe.dev`; r-universe inclusion is a
-release consequence, not a substitute for those checks.
+Development is public and remains experimental while execution, extension,
+artifact, and downstream application contracts are incomplete. The verified
+provider and agent-core rows are recorded separately in the parity ledger. A
+tagged release follows only after the declared release scope is satisfied, every
+package installs and checks on supported platforms, required live provider
+checks pass without stored credentials, generated documentation is current,
+and a secret scan is clean. R-universe inclusion is release distribution, not a
+substitute for those checks.

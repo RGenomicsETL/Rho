@@ -57,7 +57,7 @@ checkpoint while retaining the complete transcript, and
 Threshold compaction and one retry for a typed provider input-limit
 value use the same compactor and policy generics.
 
-Extensions build on this lifecycle in
-[`rho.ext`](https://rgenomicsetl.github.io/Rho/rho.ext/). See the
-[`rho.agent`
+`rho.ext` is not yet bound to this lifecycle; the integration-or-removal
+proof is tracked in [issue
+\#9](https://github.com/RGenomicsETL/Rho/issues/9). See the [`rho.agent`
 reference](https://rgenomicsetl.github.io/Rho/rho.agent/reference/).

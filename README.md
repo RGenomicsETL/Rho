@@ -140,6 +140,15 @@ reference site.
 | **rho.bio.agent** | bioinformatics tools registered through the extension API | [guide](https://rgenomicsetl.github.io/Rho/rho.bio.agent/) · [reference](https://rgenomicsetl.github.io/Rho/rho.bio.agent/reference/) |
 | **rho.testkit** | bounded assertions for asynchronous tests | [guide](https://rgenomicsetl.github.io/Rho/rho.testkit/) · [reference](https://rgenomicsetl.github.io/Rho/rho.testkit/reference/) |
 
+The table names package responsibilities, not completion. The current
+`rho.ext` runtime is not connected to `rho.agent`; `rho.bio.agent` only
+lists registered manifests; the DuckDB SQL guard is lexical; and coding
+file/Bash tools still inherit host filesystem and environment authority.
+These gaps are tracked in issues
+[\#7](https://github.com/RGenomicsETL/Rho/issues/7),
+[\#9](https://github.com/RGenomicsETL/Rho/issues/9), and
+[\#11](https://github.com/RGenomicsETL/Rho/issues/11).
+
 Provider implementations with no independent dependency or ABI
 constraint live in `rho.ai`. OpenAI Codex, GitHub Copilot, Z.ai, OpenAI,
 Anthropic, Ollama, and the deterministic faux provider therefore share

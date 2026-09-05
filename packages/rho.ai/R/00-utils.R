@@ -10,6 +10,25 @@ rho_optional_string <- S7::new_property(
   }
 )
 
+rho_scalar_string <- function(value) {
+  is.character(value) && length(value) == 1L && !is.na(value)
+}
+
+rho_non_empty_scalar_string <- function(value) {
+  rho_scalar_string(value) && nzchar(value)
+}
+
+rho_scalar_number <- function(value) {
+  is.numeric(value) && length(value) == 1L && !is.na(value)
+}
+
+rho_valid_oauth_token_fields <- function(access, refresh, expires_in) {
+  rho_non_empty_scalar_string(access) &&
+    rho_non_empty_scalar_string(refresh) &&
+    rho_scalar_number(expires_in) &&
+    expires_in > 0
+}
+
 rho_unique_non_empty_strings <- S7::new_property(
   S7::class_character,
   default = character(),
@@ -96,7 +115,7 @@ rho_authorization_code <- function(input, expected_state, provider) {
   if (nzchar(parsed$state %||% "") && !identical(parsed$state, expected_state)) {
     return(rho_auth_error(sprintf("%s authorization state mismatch", provider), code = "state"))
   }
-  if (!is.character(parsed$code) || length(parsed$code) != 1L || !nzchar(parsed$code)) {
+  if (!rho_non_empty_scalar_string(parsed$code)) {
     return(rho_auth_error(
       sprintf("%s authorization code is missing", provider),
       code = "authorization_code"

@@ -93,7 +93,10 @@ Known incomplete work, stated directly:
   remains an explicit unsupported strategy until its lifecycle and fixtures
   exist. Embedded providers run through an explicit executor that returns a
   stream or a task resolving to one.
-- `rho.duckdb` has a conservative read-only SQL guard; production hardening should add a parser-backed guard before enabling untrusted SQL.
+- `rho.duckdb` has only a lexical first-token/forbidden-keyword SQL guard. It
+  accepts multiple-statement and unmodelled effect paths and must not receive
+  untrusted SQL; parser-backed statement plus relation/path capability admission
+  is tracked in issue #7.
 - The Bash tool currently returns complete combined output. Pi-equivalent
   incremental output updates, bounded tail retention, and persisted full-output
   artifacts remain explicit coding-agent parity work.
@@ -103,6 +106,8 @@ Known incomplete work, stated directly:
 - `rho_task_from_function()` defers an R closure but does not move blocking work
   out of the main R process. Credential-file reads, coding filesystem tools, and
   DuckDB calls still need explicit compute bindings where they may block.
+  `rho_resolve_resource()` currently invokes its resolver before returning a
+  task, which is a stronger effect-contract violation tracked in issue #8.
 - `RhoFileCredentialStore` remains plaintext JSON with owner-only permissions
   for explicit development use. `RhoEncryptedFileCredentialStore` supplies
   Argon2id/XChaCha20-Poly1305 portable storage, and
@@ -117,6 +122,14 @@ Known incomplete work, stated directly:
   as-of time queries, graph walks, and a pinned prompt-index contribution remain
   downstream work; the tools do not silently add note bodies to the system
   prompt.
+- `rho.ext` is a standalone string-keyed registry/dispatcher and is not bound to
+  `rho.agent`. `rho.bio.agent` registers only one manifest-listing tool and does
+  not resolve, query, retain receipts, or project a ledger. Issue #9 requires a
+  real typed lifecycle slice or removal of the dormant surface.
+- Coding read/write tools use the host user's ordinary paths and Bash inherits
+  the current process environment by default. Secret-bearing model-auth and HTTP
+  request values also print their contents. Explicit capability admission and
+  secret-safe representation are tracked in issue #11.
 - Graphics, tool output, and bio resources do not yet share an artifact store.
 - `rho.compute` does not yet model pool lifecycle, placement, affinity, bounded
   queues, or remote execution receipts.

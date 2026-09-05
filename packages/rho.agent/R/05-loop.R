@@ -28,6 +28,8 @@ rho_set_agent_idle <- function(agent) {
   agent@state$phase <- RhoAgentIdle()
   agent@state$current_stream <- NULL
   agent@state$pending_tool_calls <- character()
+  agent@state$active_tool_tasks <- list()
+  agent@state$active_tool_sequence <- 0L
   nanonext::cv_signal(agent@state$idle_condition)
   waiters <- agent@state$idle_waiters
   agent@state$idle_waiters <- list()
@@ -100,6 +102,16 @@ rho_invalid_agent_run <- function(agent, events_before, message) {
   rho_agent_run_result(agent, events_before, list(), status = "error", error = error)
 }
 
+rho_agent_run_status_from_error <- function(error) {
+  if (is.null(error)) {
+    "completed"
+  } else if (identical(error@kind, "aborted")) {
+    "aborted"
+  } else {
+    "error"
+  }
+}
+
 rho_run_agent_loop <- function(
   agent,
   prompts,
@@ -144,7 +156,6 @@ rho_run_agent_loop <- function(
     function() {
       on.exit(rho_set_agent_idle(agent), add = TRUE)
       tool_results <- list()
-      run_status <- "completed"
       run_error <- NULL
       turn <- 0L
       input_limit_recovery_attempted <- FALSE
@@ -172,7 +183,6 @@ rho_run_agent_loop <- function(
             rho_append_agent_messages(agent, pending)
           ))
           if (S7::S7_inherits(appended, RhoSessionJournalErrorValue)) {
-            run_status <- "error"
             run_error <- appended
             break
           }
@@ -186,7 +196,6 @@ rho_run_agent_loop <- function(
           S7::S7_inherits(model_context, RhoCompactionErrorValue) ||
             S7::S7_inherits(model_context, RhoAgentErrorValue)
         ) {
-          run_status <- "error"
           run_error <- model_context
           break
         }
@@ -224,14 +233,8 @@ rho_run_agent_loop <- function(
             }
             if (S7::S7_inherits(compacted, RhoCompactionErrorValue)) {
               run_error <- compacted
-              run_status <- "error"
               break
             }
-          }
-          if (identical(response@error@kind, "aborted")) {
-            run_status <- "aborted"
-          } else {
-            run_status <- "error"
           }
           run_error <- response@error
           break
@@ -249,7 +252,6 @@ rho_run_agent_loop <- function(
           error = function(error) error
         )
         if (inherits(batch, "error")) {
-          run_status <- "error"
           run_error <- rho_agent_error(conditionMessage(batch), "tool_execution")
           coro::await(rho.async::rho_as_promise(
             rho_emit_agent_event(agent, rho_turn_end_event(turn, assistant, list()))
@@ -268,7 +270,6 @@ rho_run_agent_loop <- function(
           }
         }
         if (!is.null(journal_error)) {
-          run_status <- "error"
           run_error <- journal_error
           break
         }
@@ -295,7 +296,6 @@ rho_run_agent_loop <- function(
           inherits(decision, "error") ||
             !S7::S7_inherits(decision, RhoNextTurnDecision)
         ) {
-          run_status <- "error"
           if (inherits(decision, "error")) {
             message <- conditionMessage(decision)
           } else {
@@ -315,9 +315,8 @@ rho_run_agent_loop <- function(
         }
         if (decision@stop || isTRUE(agent@state$cancelled)) {
           if (isTRUE(agent@state$cancelled)) {
-            run_status <- "aborted"
             run_error <- rho_agent_error(
-              agent@state$cancel_reason %||% "Agent run was cancelled",
+              rho_agent_cancel_message(agent, "Agent run was cancelled"),
               "aborted"
             )
           }
@@ -344,6 +343,7 @@ rho_run_agent_loop <- function(
         if (!length(pending)) break
       }
 
+      run_status <- rho_agent_run_status_from_error(run_error)
       coro::await(rho.async::rho_as_promise(
         rho_emit_agent_event(agent, rho_agent_end_event(agent@state$messages))
       ))

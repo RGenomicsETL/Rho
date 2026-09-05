@@ -1,5 +1,8 @@
 # rho.agent 0.0.1.9001
 
+- Cancels active tool tasks when an agent is aborted, retains their task handles
+  only for the active call, and records cancellation as a tool error before the
+  aborted run settles.
 - Accounts for the complete transformed provider context before compaction.
   Reported token counts are reused only for the same model, prompt, tool,
   operation, and activation revision. Agent run results include cumulative

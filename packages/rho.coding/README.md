@@ -8,9 +8,13 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 <!-- badges: end -->
 
 [`rho.coding`](https://rgenomicsetl.github.io/Rho/rho.coding/) supplies
-coding tools with explicit execution semantics: file operations, Bash
-with a typed cross-platform resolution, isolated R evaluation in mirai,
+coding tools for file operations, Bash, isolated R evaluation in mirai,
 and opt-in evaluation in a caller-supplied current-session environment.
+The current file tools use the host user’s ordinary filesystem
+permissions, and the Bash tool inherits the current process environment
+by default. They are **not a sandbox or an explicit least-authority
+execution profile**; that work is tracked in [issue
+\#11](https://github.com/RGenomicsETL/Rho/issues/11).
 
 ## Isolated R evaluation
 
@@ -40,15 +44,14 @@ data.frame(
 #> 1    91        TRUE
 ```
 
-The ordinary R tool is isolated and may overlap with another call. A
-`RhoCurrentSessionREvaluator` instead receives an explicit environment
-and requires exclusive scheduling. `RhoRExpression` is also a
-`RhoOperation`, and the chosen evaluator is recorded in a
-`RhoREvaluationBinding`. A remote NNG evaluator therefore adds evaluator
-methods rather than another agent execution path. Bash follows the same
-discipline: on Windows it resolves a real Bash implementation rather
-than translating model-generated Bash into another shell language, and
-on Unix it reports a typed unavailable value when Bash is absent.
+The ordinary R tool runs in an isolated mirai worker and may overlap
+with another call. A `RhoCurrentSessionREvaluator` instead receives an
+explicit environment and requires exclusive scheduling. `RhoRExpression`
+is also a `RhoOperation`, and the chosen evaluator is recorded in a
+`RhoREvaluationBinding`. Bash resolves a real Bash implementation rather
+than translating model-generated Bash into another shell language. Mirai
+placement alone does not restrict Bash filesystem, environment, process,
+or network authority.
 
 ## Session replay
 

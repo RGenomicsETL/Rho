@@ -1093,6 +1093,76 @@ rho_jsonl_record_line <- function(codec, entry, position) {
   )
 }
 
+rho_jsonl_corrupt_file <- function(message) {
+  RhoJsonlCorruptFile(message = message, retryable = FALSE)
+}
+
+rho_jsonl_read_line <- function(line, invalid_message) {
+  tryCatch(
+    yyjsonr::read_json_str(
+      line,
+      arr_of_objs_to_df = FALSE,
+      obj_of_arrs_to_df = FALSE
+    ),
+    error = function(error) rho_jsonl_corrupt_file(invalid_message)
+  )
+}
+
+rho_jsonl_header_identity <- function(line) {
+  invalid <- "The JSONL journal header is invalid"
+  header <- rho_jsonl_read_line(line, invalid)
+  valid <- is.list(header) &&
+    all(
+      !S7::S7_inherits(header, RhoJsonlCorruptFile),
+      identical(header$schema, "rho.session.jsonl"),
+      identical(header$type, "session")
+    )
+  if (!valid) {
+    return(rho_jsonl_corrupt_file(invalid))
+  }
+  tryCatch(
+    rho.agent::RhoSessionIdentity(
+      id = header$id,
+      parent_id = header$parent_id
+    ),
+    error = function(error) rho_jsonl_corrupt_file(invalid)
+  )
+}
+
+rho_jsonl_record_entries <- function(lines) {
+  entries <- vector("list", length(lines))
+  for (index in seq_along(lines)) {
+    line_number <- index + 1L
+    if (endsWith(lines[[index]], "\r")) {
+      return(rho_jsonl_corrupt_file(
+        "The JSONL journal must use LF framing"
+      ))
+    }
+    record <- rho_jsonl_read_line(
+      lines[[index]],
+      sprintf("JSONL line %d is not valid JSON", line_number)
+    )
+    if (S7::S7_inherits(record, RhoJsonlCorruptFile)) {
+      return(record)
+    }
+    valid <- is.list(record) &&
+      all(
+        identical(record$schema, "rho.session.jsonl"),
+        identical(record$type, "entry"),
+        identical(as.integer(record$position), as.integer(index)),
+        is.list(record$entry)
+      )
+    if (!valid) {
+      return(rho_jsonl_corrupt_file(sprintf(
+        "JSONL line %d has an invalid session record",
+        line_number
+      )))
+    }
+    entries[[index]] <- record$entry
+  }
+  entries
+}
+
 rho_jsonl_inspect_file <- function(path) {
   tryCatch(
     {
@@ -1101,10 +1171,7 @@ rho_jsonl_inspect_file <- function(path) {
       }
       size <- file.info(path)$size
       if (is.na(size) || size > .Machine$integer.max) {
-        return(RhoJsonlCorruptFile(
-          message = "The JSONL journal size is invalid",
-          retryable = FALSE
-        ))
+        return(rho_jsonl_corrupt_file("The JSONL journal size is invalid"))
       }
       if (size == 0) {
         return(RhoJsonlEmptyInspection(position = 0L, entries = list()))
@@ -1113,94 +1180,33 @@ rho_jsonl_inspect_file <- function(path) {
       on.exit(close(connection), add = TRUE)
       bytes <- readBin(connection, what = "raw", n = as.integer(size))
       if (!identical(bytes[[length(bytes)]], as.raw(10L))) {
-        return(RhoJsonlCorruptFile(
-          message = "The JSONL journal ends with a partial line",
-          retryable = FALSE
+        return(rho_jsonl_corrupt_file(
+          "The JSONL journal ends with a partial line"
         ))
       }
       text <- rawToChar(bytes[-length(bytes)])
       if (!nzchar(text) || startsWith(text, "\n") || endsWith(text, "\n")) {
-        return(RhoJsonlCorruptFile(
-          message = "The JSONL journal contains an empty line",
-          retryable = FALSE
+        return(rho_jsonl_corrupt_file(
+          "The JSONL journal contains an empty line"
         ))
       }
       lines <- strsplit(text, "\n", fixed = TRUE)[[1L]]
       if (any(!nzchar(lines))) {
-        return(RhoJsonlCorruptFile(
-          message = "The JSONL journal contains an empty line",
-          retryable = FALSE
+        return(rho_jsonl_corrupt_file(
+          "The JSONL journal contains an empty line"
         ))
       }
-      header <- tryCatch(
-        yyjsonr::read_json_str(
-          lines[[1L]],
-          arr_of_objs_to_df = FALSE,
-          obj_of_arrs_to_df = FALSE
-        ),
-        error = function(error) error
-      )
-      valid_header <- !inherits(header, "error") &&
-        is.list(header) &&
-        identical(header$schema, "rho.session.jsonl") &&
-        identical(header$type, "session") &&
-        is.character(header$id) &&
-        length(header$id) == 1L &&
-        !is.na(header$id) &&
-        nzchar(header$id) &&
-        is.character(header$parent_id) &&
-        length(header$parent_id) == 1L &&
-        !is.na(header$parent_id)
-      if (!valid_header) {
-        return(RhoJsonlCorruptFile(
-          message = "The JSONL journal header is invalid",
-          retryable = FALSE
-        ))
+      identity <- rho_jsonl_header_identity(lines[[1L]])
+      if (S7::S7_inherits(identity, RhoJsonlCorruptFile)) {
+        return(identity)
       }
-
-      record_lines <- lines[-1L]
-      entries <- vector("list", length(record_lines))
-      for (index in seq_along(record_lines)) {
-        line_number <- index + 1L
-        if (endsWith(record_lines[[index]], "\r")) {
-          return(RhoJsonlCorruptFile(
-            message = "The JSONL journal must use LF framing",
-            retryable = FALSE
-          ))
-        }
-        record <- tryCatch(
-          yyjsonr::read_json_str(
-            record_lines[[index]],
-            arr_of_objs_to_df = FALSE,
-            obj_of_arrs_to_df = FALSE
-          ),
-          error = function(error) error
-        )
-        if (inherits(record, "error")) {
-          return(RhoJsonlCorruptFile(
-            message = sprintf("JSONL line %d is not valid JSON", line_number),
-            retryable = FALSE
-          ))
-        }
-        valid <- is.list(record) &&
-          identical(record$schema, "rho.session.jsonl") &&
-          identical(record$type, "entry") &&
-          identical(as.integer(record$position), as.integer(index)) &&
-          is.list(record$entry)
-        if (!valid) {
-          return(RhoJsonlCorruptFile(
-            message = sprintf(
-              "JSONL line %d has an invalid session record",
-              line_number
-            ),
-            retryable = FALSE
-          ))
-        }
-        entries[[index]] <- record$entry
+      entries <- rho_jsonl_record_entries(lines[-1L])
+      if (S7::S7_inherits(entries, RhoJsonlCorruptFile)) {
+        return(entries)
       }
       RhoJsonlPresentInspection(
-        session_id = header$id,
-        parent_session_id = header$parent_id,
+        session_id = identity@id,
+        parent_session_id = identity@parent_id,
         position = as.integer(length(entries)),
         entries = entries
       )

@@ -493,6 +493,8 @@ RhoAgent <- S7::new_class(
       "follow_up_queue",
       "phase",
       "pending_tool_calls",
+      "active_tool_tasks",
+      "active_tool_sequence",
       "events",
       "event_sequence",
       "run_sequence",

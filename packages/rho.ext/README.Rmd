@@ -12,10 +12,13 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
 
-[`rho.ext`](https://rgenomicsetl.github.io/Rho/rho.ext/) is the open
-extension runtime for [Rho](https://rgenomicsetl.github.io/Rho/). Extensions register handlers,
-tools, commands, and providers through an explicit API object; they do not
-patch package globals.
+[`rho.ext`](https://rgenomicsetl.github.io/Rho/rho.ext/) is currently a
+standalone extension-registry prototype. It can register handlers, tools,
+commands, and providers through an explicit API object, but it is **not yet
+bound to `rho.agent`'s typed lifecycle**. Registered tools are not admitted to an
+agent automatically, and character event dispatch is not the intended durable
+event protocol. That integration-or-removal decision is tracked in
+[issue #9](https://github.com/RGenomicsETL/Rho/issues/9).
 
 ## An asynchronous handler chain
 
@@ -37,9 +40,10 @@ results <- rho_dispatch_event(
 results[[1L]]
 ```
 
-The dispatcher normalizes plain handler values and tasks. This
-lets an extension perform I/O, ask for permission, or consult policy without
-turning the agent loop into a synchronous callback system.
+The standalone dispatcher normalizes plain handler values and tasks. This
+example proves ordering only inside `RhoExtensionRuntime`; it does not prove
+agent event ordering, policy admission, committed-session notification, or
+shutdown flushing.
 
 See the [`rho.ext` reference](https://rgenomicsetl.github.io/Rho/rho.ext/reference/),
 the upstream [`rho.agent`](https://rgenomicsetl.github.io/Rho/rho.agent/) lifecycle, and the downstream

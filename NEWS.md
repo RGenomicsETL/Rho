@@ -1,5 +1,7 @@
 # Rho 0.0.1.9001
 
+- Propagates agent aborts to active tool tasks instead of waiting for their
+  ordinary completion.
 - Adds explicit encrypted-file and native-keychain credential stores. Portable
   storage authenticates the complete credential envelope; keychain storage
   rejects environment and file backends.

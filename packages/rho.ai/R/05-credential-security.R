@@ -270,15 +270,14 @@ rho_encrypted_credential_envelope <- function(store, document) {
 
 rho_valid_encrypted_credential_envelope <- function(envelope, store) {
   valid <- is.list(envelope) &&
-    identical(envelope$format, "rho.ai.encrypted-credential-store") &&
-    identical(envelope$version, 1L) &&
-    identical(envelope$cipher, "xchacha20poly1305") &&
-    is.list(envelope$kdf) &&
-    is.list(envelope$metadata) &&
-    is.character(envelope$ciphertext) &&
-    length(envelope$ciphertext) == 1L &&
-    !is.na(envelope$ciphertext) &&
-    nzchar(envelope$ciphertext)
+    all(
+      identical(envelope$format, "rho.ai.encrypted-credential-store"),
+      identical(envelope$version, 1L),
+      identical(envelope$cipher, "xchacha20poly1305"),
+      is.list(envelope$kdf),
+      is.list(envelope$metadata),
+      rho_non_empty_scalar_string(envelope$ciphertext)
+    )
   if (!valid) {
     return(rho_credential_document_error(
       "Credential store is not a supported encrypted credential envelope",
@@ -338,9 +337,7 @@ rho_decrypt_credential_document <- function(store, envelope) {
       "credential_store_format"
     ))
   }
-  valid_document <- is.numeric(document$version) &&
-    length(document$version) == 1L &&
-    !is.na(document$version) &&
+  valid_document <- rho_scalar_number(document$version) &&
     document$version == 1 &&
     is.list(document$credentials)
   if (!valid_document) {

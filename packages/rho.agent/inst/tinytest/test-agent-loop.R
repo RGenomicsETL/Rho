@@ -529,6 +529,40 @@ expect_true(S7::S7_inherits(result@error, RhoAgentErrorValue))
 expect_equal(result@error@message, "fixture cancellation")
 expect_true(S7::S7_inherits(agent@state$phase, RhoAgentIdle))
 
+tool_cancelled <- FALSE
+slow <- rho_fixture_tool("slow", function(id, args, signal, on_update, ctx) {
+  later::later(
+    function() rho_abort_agent(ctx@run@agent, "cancel active tool"),
+    0.05
+  )
+  promise <- promises::promise(function(resolve, reject) NULL)
+  rho_task_from_promise(
+    promise,
+    cancel = function(reason) tool_cancelled <<- identical(reason, "cancel active tool")
+  )
+})
+provider <- rho_scripted_agent_provider(list(
+  rho_scripted_tool_turn(list(ToolCall(
+    id = "slow-1",
+    name = "slow",
+    arguments = list(value = "fixture")
+  ))),
+  rho_scripted_text_turn()
+))
+agent <- rho_agent(provider, rho_model("fixture", "fixture"), tools = list(slow))
+
+started <- proc.time()[["elapsed"]]
+result <- rho_prompt(agent, "cancel the active tool") |>
+  rho_await(timeout = 5000L)
+elapsed <- proc.time()[["elapsed"]] - started
+
+expect_equal(result@status, "aborted")
+expect_true(tool_cancelled)
+expect_true(result@tool_results[[1L]]@is_error)
+expect_match(result@tool_results[[1L]]@content[[1L]]@text, "cancel active tool")
+expect_true(elapsed < 1)
+expect_equal(length(agent@state$active_tool_tasks), 0L)
+
 state_agent <- rho_agent(rho_faux_provider(), rho_model("faux", "faux"))
 rho_prompt(state_agent, "state") |> rho_await()
 

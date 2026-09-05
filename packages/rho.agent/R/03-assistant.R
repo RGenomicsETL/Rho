@@ -168,7 +168,7 @@ rho_receive_assistant <- function(agent, context) {
       repeat {
         if (isTRUE(agent@state$cancelled)) {
           error <- rho_agent_error(
-            agent@state$cancel_reason %||% "Agent run was cancelled",
+            rho_agent_cancel_message(agent, "Agent run was cancelled"),
             "aborted"
           )
           coro::await(rho.async::rho_as_promise(rho_fail_assistant_turn(turn, error)))
@@ -184,7 +184,7 @@ rho_receive_assistant <- function(agent, context) {
         if (inherits(item, "error")) {
           if (isTRUE(agent@state$cancelled)) {
             error <- rho_agent_error(
-              agent@state$cancel_reason %||% "Agent run was cancelled",
+              rho_agent_cancel_message(agent, "Agent run was cancelled"),
               "aborted"
             )
           } else {

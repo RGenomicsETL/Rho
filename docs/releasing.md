@@ -24,7 +24,7 @@ It runs the same `make check-secrets` scan before every push, over the local
 Git history and working tree. Git never transfers hook configuration with a
 clone, so this is deliberately an explicit setup step.
 
-Before changing repository visibility:
+Before publishing a tagged release or changing the R-universe package set:
 
 1. Run `make rd` and `make rdm`, then commit the generated namespaces,
    manuals, tests, model catalog, and package READMEs.
@@ -40,6 +40,8 @@ Before changing repository visibility:
    remove the pin until an upstream release provides the semantics exercised by
    `rho.http`.
 
-After those conditions hold, change `RGenomicsETL/Rho` to public, enable the
-pkgdown deployment workflow, and add the repository and its nanonext dependency
-to `RGenomicsETL/rgenomicsetl.r-universe.dev`.
+The repository and Pages deployment are already public. After those conditions
+hold, create the release from the audited commit and update
+`RGenomicsETL/rgenomicsetl.r-universe.dev` for every package in the declared
+release set. Verify the resulting package builds; repository visibility and a
+green Pages workflow are not release evidence by themselves.
