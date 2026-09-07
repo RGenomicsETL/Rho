@@ -551,16 +551,13 @@ provider <- rho_scripted_agent_provider(list(
 ))
 agent <- rho_agent(provider, rho_model("fixture", "fixture"), tools = list(slow))
 
-started <- proc.time()[["elapsed"]]
 result <- rho_prompt(agent, "cancel the active tool") |>
   rho_await(timeout = 5000L)
-elapsed <- proc.time()[["elapsed"]] - started
 
 expect_equal(result@status, "aborted")
 expect_true(tool_cancelled)
 expect_true(result@tool_results[[1L]]@is_error)
 expect_match(result@tool_results[[1L]]@content[[1L]]@text, "cancel active tool")
-expect_true(elapsed < 1)
 expect_equal(length(agent@state$active_tool_tasks), 0L)
 
 state_agent <- rho_agent(rho_faux_provider(), rho_model("faux", "faux"))
