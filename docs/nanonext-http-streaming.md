@@ -9,9 +9,9 @@ details that should remain private to NNG.
 
 The shape below is a proposal. [Issue #329](https://github.com/r-lib/nanonext/issues/329)
 is still open, and upstream
-[`9d32d058`](https://github.com/r-lib/nanonext/commit/9d32d058ae03e7bc51d72e1f61a7694923c63b65)
+[`a22c6f66`](https://github.com/r-lib/nanonext/commit/a22c6f66a) (1.10.3.9000)
 does not export `ncurl_stream()`. The RGenomicsETL fork has been rebased onto that
-commit, preserving its public interfaces. Its version is `1.10.2.9001`.
+commit, preserving its public interfaces. Its version is `1.10.3.9001`.
 
 The current fork has more API additions than the original HTTP prototype:
 

@@ -13,14 +13,14 @@ Encoding: UTF-8
 Depends: R (>= 4.6.0)
 Roxygen: list(markdown = TRUE)
 Imports:
-    S7, s7contract, nanonext (>= 1.10.2.9001), coro, later, promises,
+    S7, s7contract, nanonext (>= 1.10.3.9001), coro, later, promises,
     yyjsonr, digest, base64enc, keyring, rmonocypher, processx, filelock,
     grDevices, utils
 Suggests:
     DBI, duckdb, mirai, httr2, curl, tinytest, knitr, rmarkdown,
     ggplot2, svglite, ragg, litedown
 Remotes:
-    RGenomicsETL/nanonext@084c8eb82a35c38b2aaf7dd203414829c2bd8011
+    RGenomicsETL/nanonext@ee180dd55e6ec1f374aaa34bc85ff47170b0d167
 URL: https://github.com/RGenomicsETL/Rho, https://rgenomicsetl.github.io/Rho/
 BugReports: https://github.com/RGenomicsETL/Rho/issues
 Config/roxygen2/version: 8.0.0

@@ -150,7 +150,7 @@ substrate without defining it.
 Rho targets R 4.6 or newer. Install the development package from a
 checkout. The required nanonext development build comes from the pinned
 [RGenomicsETL
-fork](https://github.com/RGenomicsETL/nanonext/tree/084c8eb82a35c38b2aaf7dd203414829c2bd8011),
+fork](https://github.com/RGenomicsETL/nanonext/tree/ee180dd55e6ec1f374aaa34bc85ff47170b0d167),
 not the r-lib release; the `Remotes` field declares this source.
 
 ``` bash
