@@ -6,11 +6,10 @@ rendering, Rmd-driven tinytest specs, and provider request builders. Package API
 documentation and namespaces are generated from roxygen2 tags. Air is the
 authoritative formatter; the local verified version is 0.10.0.
 
-All thirteen source packages are versioned `0.0.1.9001`, build from tarballs, and
-report `Status: OK` under `R CMD check --no-manual` locally and in the R 4.4 and
-R-release CI jobs. The check driver treats every NOTE, WARNING, or ERROR as a
-failed monorepo gate. This establishes package health; it does not claim provider
-or Pi behavioral parity.
+The root package `rho` is versioned `0.0.1.9001`. Its authored Rmd tests form
+one suite, and `R CMD build` and `R CMD check --no-manual` run on one tarball.
+These gates establish package health; they do not claim provider or Pi
+behavioral parity.
 
 Verified executable behavior now includes typed assistant events, repeated agent
 turns, awaited listeners, steering/follow-up machinery, cancellation, typed
@@ -67,7 +66,7 @@ text.
 
 Known incomplete work, stated directly:
 
-- `rho.ai::rho_faux_provider()` is the deterministic provider used by tests.
+- `rho::rho_faux_provider()` is the deterministic provider used by tests.
 - OpenAI Responses/Codex, Anthropic Messages, and Ollama's OpenAI-compatible
   chat protocol have typed request and event protocols with end-to-end agent
   fixtures. External-account checks remain recorded in the parity ledger.
@@ -76,7 +75,7 @@ Known incomplete work, stated directly:
   offers API-key and JWT bearer authentication, not an OAuth device grant;
   requesting OAuth therefore resolves to a typed unsupported login-method value
   without prompting or issuing a network request.
-- `rho.http::rho_sse_connect()` opens the response with the pinned nanonext
+- `rho::rho_sse_connect()` opens the response with the pinned nanonext
   `ncurl_stream_aio()` fork and incrementally decodes arbitrary body chunks. The
   transport remains pinned while
   [nanonext issue #329](https://github.com/r-lib/nanonext/issues/329) establishes

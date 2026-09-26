@@ -8,9 +8,9 @@ supported by an executable fixture.
 
 ## Current foundation
 
-- Thirteen packages share version `0.0.1.9001` and pass the monorepo package
-  checks.
-- `rho.async`, `rho.http`, `rho.ai`, and `rho.agent` provide the task, stream,
+- The `rho` package is version `0.0.1.9001`; its components share one namespace
+  and one package check.
+- Its async, HTTP, provider, and agent components provide the task, stream,
   provider, and multi-turn agent contracts.
 - OpenAI, OpenAI Codex, GitHub Copilot, Anthropic, Z.ai, Kimi Code, Kimi
   Platform, Ollama, and the deterministic faux provider use the same normalized
@@ -38,7 +38,7 @@ supported by an executable fixture.
   fixtures prove lossless semantic-entry and selected-branch replay after
   restart, stale-writer rejection, and refusal to read or append after a partial
   final record. Explicit adapters isolate the wire schema from the
-  current S7 package layout.
+  current S7 class layout.
 - `rho.coding` also provides the structural `MemoryStore` interface and typed
   `remember`, `recall`, `edit_memory`, `forget`, and `memory_history` tools. Its
   reference store keeps append-only attributed revisions and tombstones, and

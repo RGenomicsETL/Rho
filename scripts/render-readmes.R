@@ -23,26 +23,7 @@ if (length(arguments) == 1L) {
   )
 }
 
-package_order <- c(
-  "rho.async",
-  "rho.http",
-  "rho.ai",
-  "rho.agent",
-  "rho.ext",
-  "rho.compute",
-  "rho.http.httr2",
-  "rho.graphics",
-  "rho.coding",
-  "rho.bio",
-  "rho.duckdb",
-  "rho.bio.agent",
-  "rho.testkit"
-)
-
-readmes <- c(
-  "README.Rmd",
-  file.path("packages", package_order, "README.Rmd")
-)
+readmes <- "README.Rmd"
 
 for (readme in readmes) {
   if (!file.exists(readme)) {

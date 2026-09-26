@@ -10,13 +10,14 @@ CI uses:
 
 ```bash
 make check-purled-tests
-make check-format
+make check-style
+make test
 make check
 ```
 
 Generated `inst/tinytest/test-*.R` files are committed to make `tinytest::test_package()` ordinary and transparent.
 
-`make check` installs packages in dependency order, builds source tarballs in a
-temporary directory, and requires exactly `Status: OK` from every package check.
+`make check` builds the `rho` source tarball and runs `R CMD check --no-manual`
+on that single package. Install dependencies first using `make deps`.
 Roxygen2 documentation is regenerated with `make rd`; the committed `NAMESPACE`
 and `man/` files are generated artifacts.

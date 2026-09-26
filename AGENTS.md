@@ -87,6 +87,9 @@ linked test, executable Rmd, or integration run.
 
 ## R and package practice
 
+- The repository root is the `rho` package. `R/` contains the components;
+  `inst/tinytest/rmd/` contains the authored test suite. Optional backends
+  keep their external dependencies in `Suggests`.
 - Target R 4.4.0 or newer. Use modern base R directly; do not redefine `%||%`
   or add compatibility shims for older R.
 - Do not create dot-prefixed pseudo-private functions or constants. Package
@@ -99,11 +102,11 @@ linked test, executable Rmd, or integration run.
 - Authored tests live in `inst/tinytest/rmd/`; generated `test-*.R` files are
   not edited. Every asynchronous test has a finite timeout.
 - Roxygen is the source for `NAMESPACE` and `man/`. Air formats authored R.
-  Run the focused test first, then the package and monorepo gates appropriate
-  to the changed contract.
+  Run the focused test first, then the package gates appropriate to the
+  changed contract.
 - Documentation describes supported behavior and links its evidence. It does
   not relay a coding session, invent output, or call an unevaluated example a
   verification.
 
-When an abstraction changes, change all consumers in the monorepo together and
+When an abstraction changes, change all consumers in `rho` together and
 retain only the clearer form.

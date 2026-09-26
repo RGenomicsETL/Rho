@@ -26,9 +26,7 @@ event protocol used by live providers. `rho_prompt()` returns before the
 result is collected; `rho_await()` is the explicit wait.
 
 ``` r
-library(rho.async)
-library(rho.ai)
-library(rho.agent)
+library(rho)
 
 agent <- rho_agent(
   provider = rho_faux_provider(),
@@ -67,8 +65,6 @@ importer accepts a Pi or Codex auth file only when its path is supplied
 by the caller.
 
 ``` r
-library(rho.coding)
-
 credential_path <- getOption("rho.openai_codex_credential")
 credential <- rho_load_openai_codex_credential(
   path = credential_path
@@ -115,44 +111,30 @@ codex_example
 Rebuild this example by supplying the credential file explicitly:
 
 ``` bash
-make rdm-codex CREDENTIAL=/absolute/path/to/auth.json
+Rscript scripts/render-readmes.R /absolute/path/to/auth.json
 ```
 
-## The packages
+## Package layout
 
-Rho keeps transport, provider semantics, agent policy, and applications
-in separate installable packages. Each package has a focused README and
-reference site.
+`rho` is one installable R package. Its task, HTTP, provider, agent,
+extension, compute, graphics, coding, and bioinformatics contracts
+remain distinct components within one namespace. DuckDB, mirai, and
+httr2/curl backends use optional dependencies. Bounded test assertions
+are internal utilities.
 
-| package | role | documentation |
-|---|---|---|
-| **rho.async** | tasks, streams, cancellation, timeouts, and composition | [guide](https://rgenomicsetl.github.io/Rho/rho.async/) · [reference](https://rgenomicsetl.github.io/Rho/rho.async/reference/) |
-| **rho.http** | transport-neutral HTTP requests, response bodies, and SSE decoding, with a nanonext client | [guide](https://rgenomicsetl.github.io/Rho/rho.http/) · [reference](https://rgenomicsetl.github.io/Rho/rho.http/reference/) |
-| **rho.http.httr2** | worker-owned httr2 implementation of the HTTP client contract | [guide](https://rgenomicsetl.github.io/Rho/rho.http.httr2/) · [reference](https://rgenomicsetl.github.io/Rho/rho.http.httr2/reference/) |
-| **rho.ai** | messages, models, capabilities, credentials, providers, and tools | [guide](https://rgenomicsetl.github.io/Rho/rho.ai/) · [reference](https://rgenomicsetl.github.io/Rho/rho.ai/reference/) |
-| **rho.agent** | multi-turn execution, session compaction, tool scheduling, queues, cancellation, and events | [guide](https://rgenomicsetl.github.io/Rho/rho.agent/) · [reference](https://rgenomicsetl.github.io/Rho/rho.agent/reference/) |
-| **rho.ext** | asynchronous extension handlers and capability registration | [guide](https://rgenomicsetl.github.io/Rho/rho.ext/) · [reference](https://rgenomicsetl.github.io/Rho/rho.ext/reference/) |
-| **rho.compute** | typed mirai expression and function-call tasks | [guide](https://rgenomicsetl.github.io/Rho/rho.compute/) · [reference](https://rgenomicsetl.github.io/Rho/rho.compute/reference/) |
-| **rho.graphics** | declared graphics devices and hashed artifacts | [guide](https://rgenomicsetl.github.io/Rho/rho.graphics/) · [reference](https://rgenomicsetl.github.io/Rho/rho.graphics/reference/) |
-| **rho.coding** | Bash, file, isolated-worker R, and explicit current-session R tools | [guide](https://rgenomicsetl.github.io/Rho/rho.coding/) · [reference](https://rgenomicsetl.github.io/Rho/rho.coding/reference/) |
-| **rho.bio** | manifests, resolvers, receipts, and database-neutral SQL contracts | [guide](https://rgenomicsetl.github.io/Rho/rho.bio/) · [reference](https://rgenomicsetl.github.io/Rho/rho.bio/reference/) |
-| **rho.duckdb** | DuckDB implementation of the asynchronous SQL contracts | [guide](https://rgenomicsetl.github.io/Rho/rho.duckdb/) · [reference](https://rgenomicsetl.github.io/Rho/rho.duckdb/reference/) |
-| **rho.bio.agent** | bioinformatics tools registered through the extension API | [guide](https://rgenomicsetl.github.io/Rho/rho.bio.agent/) · [reference](https://rgenomicsetl.github.io/Rho/rho.bio.agent/reference/) |
-| **rho.testkit** | bounded assertions for asynchronous tests | [guide](https://rgenomicsetl.github.io/Rho/rho.testkit/) · [reference](https://rgenomicsetl.github.io/Rho/rho.testkit/reference/) |
-
-The table names package responsibilities, not completion. The current
-`rho.ext` runtime is not connected to `rho.agent`; `rho.bio.agent` only
-lists registered manifests; the DuckDB SQL guard is lexical; and coding
-file/Bash tools still inherit host filesystem and environment authority.
-These gaps are tracked in issues
+The components have separate responsibilities, not separate package
+boundaries. The current `rho.ext` runtime is not connected to
+`rho.agent`; `rho.bio.agent` only lists registered manifests; the DuckDB
+SQL guard is lexical; and coding file/Bash tools still inherit host
+filesystem and environment authority. These gaps are tracked in issues
 [\#7](https://github.com/RGenomicsETL/Rho/issues/7),
 [\#9](https://github.com/RGenomicsETL/Rho/issues/9), and
 [\#11](https://github.com/RGenomicsETL/Rho/issues/11).
 
-Provider implementations with no independent dependency or ABI
-constraint live in `rho.ai`. OpenAI Codex, GitHub Copilot, Z.ai, OpenAI,
-Anthropic, Ollama, and the deterministic faux provider therefore share
-one typed provider surface without a package per API. The [Pi parity
+Provider implementations live in `rho`. OpenAI Codex, GitHub Copilot,
+Z.ai, OpenAI, Anthropic, Ollama, and the deterministic faux provider
+therefore share one typed provider surface without a package per API.
+The [Pi parity
 ledger](https://rgenomicsetl.github.io/Rho/docs/pi-parity.html)
 distinguishes complete wire adapters from request translators whose
 normalized stream is not yet complete. OpenAI, OpenAI Codex, GitHub
@@ -160,38 +142,36 @@ Copilot, Z.ai, and Anthropic have executable normalized-stream fixtures;
 the ledger records the executable and external-account evidence for each
 adapter.
 
-Bioinformatics remains downstream: `rho.bio`, `rho.duckdb`, and
-`rho.bio.agent` consume the provider and agent substrate but do not
-define it.
+Bioinformatics contracts and adapters consume the provider and agent
+substrate without defining it.
 
 ## Install and develop
 
-Rho targets R 4.4 or newer. Install the development monorepo from a
-checkout:
+Rho targets R 4.4 or newer. Install the development package from a
+checkout. The required nanonext development build comes from the pinned
+[RGenomicsETL
+fork](https://github.com/RGenomicsETL/nanonext/tree/084c8eb82a35c38b2aaf7dd203414829c2bd8011),
+not the r-lib release; the `Remotes` field declares this source.
 
 ``` bash
 git clone git@github.com:RGenomicsETL/Rho.git
 cd Rho
-make deps
-make hooks
+Rscript -e 'remotes::install_deps(dependencies = TRUE)'
 make install
 ```
 
 The authored API documentation is roxygen; the authored tests are R
-Markdown files under each package’s `inst/tinytest/rmd/` directory.
-Generated manuals, namespaces, executable tests, and READMEs are
-reproducible from their sources.
+Markdown files under `inst/tinytest/rmd/`. Generated manuals, the
+namespace, executable tests, and the README are reproducible from their
+sources.
 
 ``` bash
 make format       # Air
 make rd           # roxygen2
 make purl-tests   # Rmd tests -> executable tinytest files
-make rdm          # rebuild package READMEs
-make check-publication
-make check-secrets # Gitleaks over history and working tree
-make test
-make check        # every package must report Status: OK
-make public-ready # complete publication gate
+make rdm          # rebuild README.md
+make test         # run unified tinytest suite
+make check        # R CMD build and R CMD check --no-manual
 ```
 
 The [Pi parity

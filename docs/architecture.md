@@ -1,23 +1,23 @@
 # Architecture
 
-Rho has an acyclic package graph and asynchronous effects.
+Rho is one R package with asynchronous effects. Its components retain an
+acyclic conceptual dependency direction:
 
 ```text
-rho.async -> rho.http -> rho.ai -> rho.agent -> rho.coding
-rho.ai -> rho.ext -> rho.bio.agent
-rho.async -> rho.compute -> rho.graphics
-rho.http + rho.compute -> rho.http.httr2
-rho.compute -> rho.coding
-rho.async -> rho.bio -> rho.duckdb
+async -> HTTP -> providers -> agent -> coding
+providers -> extensions -> bio agent
+async -> compute -> graphics
+HTTP + compute -> httr2 transport
+async -> bio -> DuckDB
 ```
 
-This is the current DESCRIPTION dependency graph. `rho.ext` is not yet bound to
-`rho.agent`, and `rho.bio.agent` does not yet consume `rho.duckdb`; that missing
-integration is tracked in [issue #9](https://github.com/RGenomicsETL/Rho/issues/9)
-rather than shown here as implemented architecture.
+This describes responsibility within the `rho` namespace, not package Imports.
+The extension runtime is not yet bound to the agent, and the bio agent does not
+yet consume the DuckDB adapter; that integration is tracked in
+[issue #9](https://github.com/RGenomicsETL/Rho/issues/9).
 
 The central rule is that effectful public APIs return `RhoTask` or `RhoStream`.
-Synchronous waiting is explicit through `rho.async::rho_await()` and test helpers.
+Synchronous waiting is explicit through `rho::rho_await()` and test helpers.
 
 ## Functional OOP contracts
 
@@ -99,9 +99,9 @@ narrower methods only for verified behavior, and extension packages may add stil
 narrower methods without editing the agent loop.
 
 HTTP implementation and provider-turn execution are separate protocols.
-`rho.http::HttpClient` owns complete HTTP requests and incremental response
+`rho::HttpClient` owns complete HTTP requests and incremental response
 bodies; nanonext and the worker-owned httr2 adapter implement the same methods.
-`rho.ai::rho_stream()` owns the normalized assistant-event result. Its default
+`rho::rho_stream()` owns the normalized assistant-event result. Its default
 method selects a typed `ProviderTransport` implemented by both the provider and
 model, then dispatches through `rho_open_provider_transport()`. SSE, WebSocket,
 cached WebSocket, and embedded execution are distinct values. An in-process model

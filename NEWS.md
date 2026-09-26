@@ -1,12 +1,14 @@
 # Rho 0.0.1.9001
 
+- Distributes the async, HTTP, provider, agent, extension, compute, graphics,
+  coding, and bioinformatics components as one top-level `rho` package with a
+  unified test suite and optional backend dependencies.
 - Propagates agent aborts to active tool tasks instead of waiting for their
   ordinary completion.
 - Adds explicit encrypted-file and native-keychain credential stores. Portable
   storage authenticates the complete credential envelope; keychain storage
   rejects environment and file backends.
-- Publishes a synchronized package version so repositories select matching
-  internal Rho dependencies instead of stale same-version artifacts.
+- Publishes one version for the Rho API.
 - Distinguishes provider-reported, explicitly estimated, and unavailable usage
   observations; nominal API-equivalent pricing is not a subscription charge.
 
@@ -31,8 +33,8 @@
 - Declares dependencies loaded by authored package tests and checks that every
   internal test dependency is present in package metadata.
 
-- Establishes the experimental monorepo for Rho's asynchronous S7 provider,
-  agent, extension, compute, graphics, coding, and bioinformatics packages.
+- Establishes the asynchronous S7 provider, agent, extension, compute,
+  graphics, coding, and bioinformatics components.
 - Adds append-only agent sessions, semantic compaction, threshold compaction,
   and one typed provider-input recovery attempt.
 - Preserves bounded non-success HTTP response bodies so provider adapters can
@@ -41,6 +43,5 @@
   and repository-history checks for the initial development release.
 - Builds the repository landing page with litedown using a responsive article
   layout and direct links to the source repository and package documentation.
-- Declares internal package remotes so concurrent R-universe builds can install
-  Rho dependencies from their monorepo directories.
+- Pins the nanonext development dependency for reproducible HTTP streaming.
 - Uses deployed package URLs for cross-package README links.

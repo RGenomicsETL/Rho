@@ -16,12 +16,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: release
           use-public-rspm: true
-
       - name: Install Gitleaks 8.30.1
         run: |
           curl --fail --location --silent --show-error \
@@ -30,11 +28,10 @@ jobs:
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" | sha256sum --check
           tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
           sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
-
       - name: Scan repository history
         run: make check-secrets
 
-  core:
+  rho:
     name: R ${{ matrix.r }}
     runs-on: ubuntu-latest
     strategy:
@@ -46,39 +43,29 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
     steps:
       - uses: actions/checkout@v4
-
       - uses: r-lib/actions/setup-pandoc@v2
-
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.r }}
           use-public-rspm: true
-
       - name: Install Air
         uses: posit-dev/setup-air@v1
-
       - name: Install dependencies
-        run: Rscript install-deps.R
-
-      - name: Verify generated tests and style contract
+        run: |
+          Rscript -e 'install.packages("remotes")'
+          make deps
+      - name: Verify generated tests and style
         run: |
           make check-version
           make check-publication
           make check-purled-tests
-          make check-models
           make check-style
-
-      - name: Install monorepo in dependency order
-        run: make install
-
       - name: Verify generated documentation
         run: |
           make rd
           make rdm
           git diff --exit-code
-
-      - name: Run test suites
+      - name: Run unified tests
         run: make test
-
-      - name: Check every package
+      - name: Build and check rho
         run: make check

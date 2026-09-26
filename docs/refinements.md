@@ -59,11 +59,11 @@ adapters. JSONL still needs an explicit recovery policy and a durability test
 that can distinguish a flushed R connection from storage synchronization.
 
 Current evidence: the
-[`SessionJournal` interface](https://github.com/RGenomicsETL/Rho/blob/main/packages/rho.agent/R/04-interfaces.R),
-[in-memory implementation](https://github.com/RGenomicsETL/Rho/blob/main/packages/rho.agent/R/06-session.R),
-[JSONL implementation](https://github.com/RGenomicsETL/Rho/blob/main/packages/rho.coding/R/03-session-jsonl.R),
-[authored in-memory fixture](https://github.com/RGenomicsETL/Rho/blob/main/packages/rho.agent/inst/tinytest/rmd/agent-loop.Rmd),
-and [authored JSONL fixture](https://github.com/RGenomicsETL/Rho/blob/main/packages/rho.coding/inst/tinytest/rmd/coding-tools.Rmd).
+[`SessionJournal` interface](https://github.com/RGenomicsETL/Rho/blob/main/R/rho.agent-04-interfaces.R),
+[in-memory implementation](https://github.com/RGenomicsETL/Rho/blob/main/R/rho.agent-06-session.R),
+[JSONL implementation](https://github.com/RGenomicsETL/Rho/blob/main/R/rho.coding-03-session-jsonl.R),
+[authored in-memory fixture](https://github.com/RGenomicsETL/Rho/blob/main/inst/tinytest/rmd/rho.agent-agent-loop.Rmd),
+and [authored JSONL fixture](https://github.com/RGenomicsETL/Rho/blob/main/inst/tinytest/rmd/rho.coding-coding-tools.Rmd).
 
 ### Immutable content versus changing state
 

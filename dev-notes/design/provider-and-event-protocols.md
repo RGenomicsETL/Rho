@@ -49,7 +49,7 @@ not acceptable as a second public profile that every consumer must understand.
 Provider protocol follows a declared endpoint or typed descriptor. It is not
 inferred from a model id, family prefix, or vendor-name regular expression.
 Model metadata is compiled from the authored R manifest at
-`packages/rho.ai/data-raw/model-registry.R` and pinned upstream projections.
+`data-raw/model-registry.R` and pinned upstream projections.
 Curated corrections state why the source cannot express the fact and cite
 stable evidence.
 

@@ -12,42 +12,28 @@ rel_path <- function(path) {
   sub(paste0("^", root, "/?"), "", path)
 }
 
-pkg_dirs <- if (dir.exists("packages")) {
-  list.dirs("packages", full.names = TRUE, recursive = FALSE)
-} else {
-  character()
-}
-
+rmd_dir <- file.path("inst", "tinytest", "rmd")
+out_dir <- file.path("inst", "tinytest")
 changed <- character()
 
-for (pkg_dir in pkg_dirs) {
-  rmd_dir <- file.path(pkg_dir, "inst", "tinytest", "rmd")
-  if (!dir.exists(rmd_dir)) {
-    next
+for (rmd in list.files(rmd_dir, pattern = "[.]Rmd$", full.names = TRUE)) {
+  stem <- tools::file_path_sans_ext(basename(rmd))
+  out <- file.path(out_dir, paste0("test-", stem, ".R"))
+  tmp <- tempfile(fileext = ".R")
+  knitr::purl(rmd, output = tmp, documentation = 0, quiet = TRUE)
+  generated <- c(
+    sprintf("# Generated from %s; do not edit.", rel_path(rmd)),
+    "",
+    readLines(tmp, warn = FALSE)
+  )
+  existing <- if (file.exists(out)) readLines(out, warn = FALSE) else character()
+  same <- identical(existing, generated)
+  if (check && !same) {
+    changed <- c(changed, rel_path(out))
   }
-  out_dir <- file.path(pkg_dir, "inst", "tinytest")
-  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-  rmd_files <- list.files(rmd_dir, pattern = "[.]Rmd$", full.names = TRUE)
-
-  for (rmd in rmd_files) {
-    stem <- tools::file_path_sans_ext(basename(rmd))
-    out <- file.path(out_dir, paste0("test-", stem, ".R"))
-    tmp <- tempfile(fileext = ".R")
-    knitr::purl(rmd, output = tmp, documentation = 0, quiet = TRUE)
-    generated <- c(
-      sprintf("# Generated from %s; do not edit.", rel_path(rmd)),
-      "",
-      readLines(tmp, warn = FALSE)
-    )
-    existing <- if (file.exists(out)) readLines(out, warn = FALSE) else character()
-    same <- identical(existing, generated)
-    if (check && !same) {
-      changed <- c(changed, rel_path(out))
-    }
-    if (!check && !same) {
-      writeLines(generated, out, useBytes = TRUE)
-      message("wrote ", rel_path(out))
-    }
+  if (!check && !same) {
+    writeLines(generated, out, useBytes = TRUE)
+    message("wrote ", rel_path(out))
   }
 }
 

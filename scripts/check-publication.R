@@ -7,8 +7,6 @@ if (length(version) != 1L) {
 }
 
 lifecycle_badge <- "https://img.shields.io/badge/lifecycle-experimental-orange.svg"
-package_dirs <- list.dirs("packages", recursive = FALSE, full.names = TRUE)
-package_dirs <- package_dirs[file.exists(file.path(package_dirs, "DESCRIPTION"))]
 errors <- character()
 
 record_error <- function(message) {
@@ -74,26 +72,10 @@ if (length(tracked_readme_cache)) {
   ))
 }
 
-for (package_dir in package_dirs) {
-  package <- read.dcf(
-    file.path(package_dir, "DESCRIPTION"),
-    fields = "Package"
-  )[[1L]]
-  check_news(
-    file.path(package_dir, "NEWS.md"),
-    sprintf("# %s %s", package, version)
-  )
-  check_readme(file.path(package_dir, "README.Rmd"))
-  check_readme(file.path(package_dir, "README.md"))
-}
-
 if (length(errors)) {
   message("Publication metadata contract failed:")
   message(paste0("- ", errors, collapse = "\n"))
   quit(status = 1L)
 }
 
-message(sprintf(
-  "Publication metadata contract passed: root and %d packages",
-  length(package_dirs)
-))
+message("Publication metadata contract passed: rho")
