@@ -1,0 +1,658 @@
+# Generated from inst/tinytest/rmd/rho.ai-provider-surface.Rmd; do not edit.
+
+library(tinytest)
+library(rho)
+
+provider <- rho_faux_provider()
+model <- rho_model("faux", "faux")
+context <- rho_context(messages = list(rho_user_message("hi")))
+events <- rho_stream(provider, model, context) |> rho_stream_collect(timeout = 1000L)
+expect_equal(
+  vapply(events, rho_assistant_event_type, character(1)),
+  c("start", "text_start", "text_delta", "text_end", "done")
+)
+expect_equal(events[[5]]@message@content[[1]]@text, "faux: hi")
+
+completion <- rho_complete(provider, model, context)
+expect_true(rho_pending(completion))
+message <- completion |> rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(message, AssistantMessage))
+expect_equal(message@content[[1L]]@text, "faux: hi")
+
+executor <- rho_embedded_executor(function(provider, model, context, options) {
+  answer <- rho_assistant_message(
+    content = list(rho_text("in-process result")),
+    provider = provider@provider_id,
+    model = model@id
+  )
+  rho_task(rho_list_stream(list(rho_assistant_done_event(answer))))
+})
+embedded_provider <- rho_embedded_provider(executor, provider_id = "fixture")
+embedded_model <- rho_model("fixture", "embedded")
+embedded_context <- rho_context(messages = list(rho_user_message("run")))
+embedded_events <- rho_stream(
+  embedded_provider,
+  embedded_model,
+  embedded_context
+) |>
+  rho_stream_collect(timeout = 1000L)
+
+expect_true(s7contract::implements(embedded_provider, Provider))
+expect_true(s7contract::implements(RhoFunctionEmbeddedExecutor, EmbeddedExecutor))
+expect_equal(length(embedded_events), 1L)
+expect_equal(embedded_events[[1L]]@message@content[[1L]]@text, "in-process result")
+
+context <- rho_context("system", list(rho_user_message("hello")))
+test_auth <- rho_model_auth(api_key = "test")
+
+openai_provider <- rho_openai_provider()
+openai_model <- rho_openai_model("gpt-5.4")
+openai <- rho_openai_request(
+  openai_provider,
+  openai_model,
+  context,
+  options = list(auth = test_auth)
+)
+expect_equal(openai@method, "POST")
+expect_true(grepl("/responses$", openai@url))
+expect_equal(openai@headers$Authorization, "Bearer test")
+expect_identical(openai@body$store, FALSE)
+expect_identical(openai@body$stream, TRUE)
+expect_true(S7::S7_inherits(openai_model, OpenAIResponsesModel))
+
+anthropic_provider <- rho_anthropic_provider()
+anthropic <- rho_anthropic_messages_request(
+  anthropic_provider,
+  rho_anthropic_model("claude-fable-5"),
+  context,
+  options = list(auth = test_auth)
+)
+expect_equal(anthropic@method, "POST")
+expect_true(grepl("/messages$", anthropic@url))
+expect_equal(anthropic@headers$`x-api-key`, "test")
+
+ollama <- rho_ollama_chat_request(
+  rho_ollama_provider(),
+  rho_ollama_model("llama3"),
+  context
+)
+expect_equal(ollama@method, "POST")
+expect_true(grepl("/v1/chat/completions$", ollama@url))
+expect_equal(ollama@body$model, "llama3")
+expect_identical(ollama@body$stream, TRUE)
+expect_true(S7::S7_inherits(rho_ollama_model("llama3"), OpenAIChatCompletionsModel))
+
+credential <- rho_openai_codex_credential(
+  access_token = "test-access-token",
+  account_id = "test-account",
+  expires = Inf
+)
+expect_equal(credential@state$refresh, "")
+codex <- rho_openai_codex_provider()
+spark <- rho_openai_codex_model("gpt-5.3-codex-spark")
+resolved_auth <- rho_await(rho_auth_to_request(codex@auth@oauth, credential))
+long_session_id <- strrep("x", 67L)
+request <- rho_openai_codex_request(
+  codex@implementation,
+  spark,
+  context,
+  options = list(auth = resolved_auth, session_id = long_session_id)
+)
+
+expect_equal(request@url, "https://chatgpt.com/backend-api/codex/responses")
+expect_equal(request@body$model, "gpt-5.3-codex-spark")
+expect_identical(request@body$store, FALSE)
+expect_identical(request@body$stream, TRUE)
+expect_equal(request@headers$`chatgpt-account-id`, "test-account")
+expect_equal(request@headers$`OpenAI-Beta`, "responses=experimental")
+expect_equal(request@headers$Accept, "text/event-stream")
+expect_equal(request@body$prompt_cache_key, strrep("x", 64L))
+expect_equal(request@headers$`session-id`, request@body$prompt_cache_key)
+expect_equal(request@headers$`x-client-request-id`, request@body$prompt_cache_key)
+expect_true(s7contract::implements(OpenAICodexOAuthAuth, OAuthAuth))
+expect_true(s7contract::implements(OpenAICodexApi, ProviderRequestTranslator))
+
+named_tool <- rho_tool_spec(
+  name = "r",
+  description = "Evaluate R code",
+  parameters = list(type = "object", properties = list()),
+  execute = function(...) NULL
+)
+tool_context <- rho_context(
+  messages = list(rho_user_message("calculate")),
+  tools = list(r = named_tool)
+)
+tool_request <- rho_openai_codex_request(
+  codex@implementation,
+  spark,
+  tool_context,
+  options = list(auth = resolved_auth)
+)
+expect_true(is.null(names(tool_request@body$tools)))
+encoded_tool_request <- yyjsonr::write_json_str(
+  tool_request@body,
+  auto_unbox = TRUE
+)
+expect_true(grepl('"tools":\\[', encoded_tool_request))
+
+credentials <- rho_memory_credential_store(list(`openai-codex` = credential))
+models <- rho_models(list(codex), credentials)
+resolution <- rho_resolve_model_auth(models, spark) |> rho_await(timeout = 1000L)
+
+expect_true(resolution@configured)
+expect_equal(resolution@source, credential@source)
+expect_equal(resolution@auth@headers$`chatgpt-account-id`, "test-account")
+expect_true(s7contract::implements(RhoMemoryCredentialStore, CredentialStore))
+
+refresh_count <- 0L
+expired <- rho_openai_codex_credential(
+  access_token = "expired-access",
+  account_id = "test-account",
+  refresh_token = "refresh",
+  expires = 0,
+  source = "test-store"
+)
+refresh_strategy <- rho_oauth_auth(
+  name = "fixture",
+  login = function(provider_id, io) expired,
+  refresh = function(current) {
+    refresh_count <<- refresh_count + 1L
+    rho_openai_codex_credential(
+      access_token = "fresh-access",
+      account_id = current@account_id,
+      refresh_token = "rotated-refresh",
+      expires = Inf,
+      source = current@source
+    )
+  },
+  to_request = function(current) rho_model_auth(api_key = current@state$access)
+)
+refresh_provider <- rho_provider(
+  id = "openai-codex",
+  implementation = rho_faux_provider(),
+  auth = rho_provider_auth(oauth = refresh_strategy),
+  models = list(spark)
+)
+refresh_path <- tempfile("rho-refresh-credentials-", fileext = ".json")
+refresh_store <- rho_file_credential_store(refresh_path, list(refresh_provider))
+rho_credential_modify(refresh_store, "openai-codex", function(current) expired) |>
+  rho_await(timeout = 1000L)
+refresh_models <- rho_models(
+  list(refresh_provider),
+  refresh_store
+)
+
+first_resolution <- rho_resolve_model_auth(refresh_models, spark) |>
+  rho_await(timeout = 1000L)
+second_resolution <- rho_resolve_model_auth(refresh_models, spark) |>
+  rho_await(timeout = 1000L)
+expect_true(first_resolution@configured)
+expect_true(second_resolution@configured)
+expect_equal(first_resolution@auth@api_key, "fresh-access")
+expect_equal(refresh_count, 1L)
+
+reopened_refresh <- rho_file_credential_store(refresh_path, list(refresh_provider))
+persisted_refresh <- rho_credential_read(reopened_refresh, "openai-codex") |>
+  rho_await(timeout = 1000L)
+expect_equal(persisted_refresh@state$access, "fresh-access")
+expect_equal(persisted_refresh@state$refresh, "rotated-refresh")
+unlink(refresh_path)
+
+stored <- rho_api_key_credential(
+  "fixture",
+  "first",
+  provider_env = list(revision = 0L)
+)
+store <- rho_memory_credential_store(list(fixture = stored))
+
+initial <- rho_credential_read(store, "fixture") |> rho_await(timeout = 1000L)
+expect_identical(initial, stored)
+
+updates <- lapply(seq_len(2L), function(index) {
+  rho_credential_modify(store, "fixture", function(current) {
+    rho_api_key_credential(
+      "fixture",
+      paste0("key-", index),
+      provider_env = list(revision = current@provider_env$revision + 1L)
+    )
+  })
+})
+rho_all(updates) |> rho_await(timeout = 1000L)
+
+modified <- rho_credential_read(store, "fixture") |> rho_await(timeout = 1000L)
+expect_equal(modified@provider_env$revision, 2L)
+
+rho_credential_delete(store, "fixture") |> rho_await(timeout = 1000L)
+expect_true(is.null(
+  rho_credential_read(store, "fixture") |> rho_await(timeout = 1000L)
+))
+
+path <- tempfile("rho-credentials-", fileext = ".json")
+provider <- rho_provider(
+  id = "fixture",
+  implementation = rho_faux_provider(),
+  auth = rho_provider_auth(api_key = rho_api_key_auth(
+    name = "fixture",
+    login = function(provider_id, io) NULL,
+    to_request = function(credential) rho_model_auth(api_key = credential@state$key)
+  )),
+  models = list()
+)
+store <- rho_file_credential_store(path, list(provider))
+
+stored <- rho_credential_modify(store, "fixture", function(current) {
+  expect_true(is.null(current))
+  rho_api_key_credential(
+    "fixture",
+    "persistent-secret",
+    provider_env = list(revision = 1L)
+  )
+}) |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(stored, RhoApiKeyCredential))
+expect_true(file.exists(path))
+if (.Platform$OS.type == "unix") {
+  expect_equal(as.character(file.info(path)$mode), "600")
+}
+
+reopened <- rho_file_credential_store(path, list(provider))
+restored <- rho_credential_read(reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_equal(restored@state$key, "persistent-secret")
+expect_equal(restored@provider_env$revision, 1L)
+expect_equal(restored@source, normalizePath(path, winslash = "/"))
+
+rho_credential_delete(reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_true(is.null(
+  rho_credential_read(reopened, "fixture") |> rho_await(timeout = 1000L)
+))
+
+writeBin(charToRaw("{"), path)
+malformed <- rho_credential_read(reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(malformed, AuthErrorValue))
+expect_equal(malformed@code, "credential_store_read")
+
+writeLines('"not a credential document"', path)
+wrong_shape <- rho_credential_read(reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(wrong_shape, AuthErrorValue))
+expect_equal(wrong_shape@code, "credential_store_format")
+unlink(path)
+
+encrypted_path <- tempfile("rho-encrypted-credentials-", fileext = ".json")
+encrypted_store <- rho_encrypted_file_credential_store(
+  encrypted_path,
+  list(provider),
+  rho_credential_passphrase("credential-store-test-passphrase")
+)
+expect_true(s7contract::implements(RhoEncryptedFileCredentialStore, CredentialStore))
+
+encrypted_stored <- rho_credential_modify(encrypted_store, "fixture", function(current) {
+  expect_true(is.null(current))
+  rho_api_key_credential(
+    "fixture",
+    "encrypted-persistent-secret",
+    provider_env = list(revision = 1L)
+  )
+}) |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(encrypted_stored, RhoApiKeyCredential))
+
+envelope_text <- paste(readLines(encrypted_path, warn = FALSE), collapse = "")
+expect_false(grepl("encrypted-persistent-secret", envelope_text, fixed = TRUE))
+expect_true(grepl("xchacha20poly1305", envelope_text, fixed = TRUE))
+
+encrypted_reopened <- rho_encrypted_file_credential_store(
+  encrypted_path,
+  list(provider),
+  rho_credential_passphrase("credential-store-test-passphrase")
+)
+encrypted_restored <- rho_credential_read(encrypted_reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_equal(encrypted_restored@state$key, "encrypted-persistent-secret")
+expect_equal(encrypted_restored@provider_env$revision, 1L)
+
+wrong_secret_store <- rho_encrypted_file_credential_store(
+  encrypted_path,
+  list(provider),
+  rho_credential_passphrase("different-test-passphrase")
+)
+wrong_secret <- rho_credential_read(wrong_secret_store, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(wrong_secret, AuthErrorValue))
+expect_equal(wrong_secret@code, "credential_store_decrypt")
+
+envelope <- yyjsonr::read_json_file(
+  encrypted_path,
+  arr_of_objs_to_df = FALSE,
+  obj_of_arrs_to_df = FALSE
+)
+envelope$metadata$fixture$kind <- "oauth"
+writeLines(yyjsonr::write_json_str(envelope, auto_unbox = TRUE), encrypted_path)
+tampered <- rho_credential_read(encrypted_reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(tampered, AuthErrorValue))
+expect_equal(tampered@code, "credential_store_decrypt")
+
+key_path <- tempfile("rho-encrypted-key-credentials-", fileext = ".json")
+key <- as.raw(seq_len(32L))
+key_store <- rho_encrypted_file_credential_store(
+  key_path,
+  list(provider),
+  rho_credential_encryption_key(key)
+)
+rho_credential_modify(key_store, "fixture", function(current) {
+  rho_api_key_credential("fixture", "key-encrypted-secret")
+}) |>
+  rho_await(timeout = 1000L)
+key_reopened <- rho_encrypted_file_credential_store(
+  key_path,
+  list(provider),
+  rho_credential_encryption_key(key)
+)
+key_restored <- rho_credential_read(key_reopened, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_equal(key_restored@state$key, "key-encrypted-secret")
+unlink(c(encrypted_path, key_path))
+
+backend <- new.env(parent = emptyenv())
+backend$credentials <- list()
+backend$list <- function(service) {
+  entries <- backend$credentials[[service]]
+  if (is.null(entries) || !length(entries)) {
+    return(data.frame(service = character(), username = character()))
+  }
+  data.frame(
+    service = rep(service, length(entries)),
+    username = names(entries)
+  )
+}
+backend$get <- function(service, username) backend$credentials[[service]][[username]]
+backend$set_with_value <- function(service, username, password) {
+  entries <- backend$credentials[[service]]
+  if (is.null(entries)) {
+    entries <- list()
+  }
+  entries[[username]] <- password
+  backend$credentials[[service]] <- entries
+  invisible(NULL)
+}
+backend$delete <- function(service, username) {
+  entries <- backend$credentials[[service]]
+  entries[[username]] <- NULL
+  backend$credentials[[service]] <- entries
+  invisible(NULL)
+}
+class(backend) <- "backend_keyrings"
+
+keychain_store <- rho_keychain_credential_store(
+  list(provider),
+  service = "rho.ai-tinytest",
+  backend = backend
+)
+expect_true(s7contract::implements(RhoKeychainCredentialStore, CredentialStore))
+keychain_stored <- rho_credential_modify(keychain_store, "fixture", function(current) {
+  expect_true(is.null(current))
+  rho_api_key_credential("fixture", "keychain-secret")
+}) |>
+  rho_await(timeout = 1000L)
+expect_true(S7::S7_inherits(keychain_stored, RhoApiKeyCredential))
+
+keychain_restored <- rho_credential_read(keychain_store, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_equal(keychain_restored@state$key, "keychain-secret")
+expect_equal(keychain_restored@source, "keychain:rho.ai-tinytest/fixture")
+rho_credential_delete(keychain_store, "fixture") |> rho_await(timeout = 1000L)
+expect_true(is.null(
+  rho_credential_read(keychain_store, "fixture") |> rho_await(timeout = 1000L)
+))
+
+insecure_backend <- tryCatch(
+  rho_keychain_credential_store(
+    list(provider),
+    service = "rho.ai-tinytest",
+    backend = keyring::backend_env$new()
+  ),
+  error = function(error) error
+)
+expect_true(inherits(insecure_backend, "error"))
+
+stored <- rho_api_key_credential(
+  "fixture",
+  "initial",
+  provider_env = list(revision = 0L)
+)
+store <- rho_memory_credential_store(list(fixture = stored))
+state <- new.env(parent = emptyenv())
+state$resolve <- NULL
+state$second_started <- FALSE
+
+first <- rho_credential_modify(store, "fixture", function(current) {
+  rho_task_from_promise(promises::promise(function(resolve, reject) {
+    state$resolve <- resolve
+  }))
+})
+second <- rho_credential_modify(store, "fixture", function(current) {
+  state$second_started <- TRUE
+  rho_api_key_credential(
+    "fixture",
+    "second",
+    provider_env = list(revision = current@provider_env$revision + 1L)
+  )
+})
+later::run_now(0.05)
+
+expect_false(state$second_started)
+state$resolve(rho_api_key_credential(
+  "fixture",
+  "first",
+  provider_env = list(revision = 1L)
+))
+rho_all(list(first, second)) |> rho_await(timeout = 1000L)
+
+modified <- rho_credential_read(store, "fixture") |>
+  rho_await(timeout = 1000L)
+expect_true(state$second_started)
+expect_equal(modified@provider_env$revision, 2L)
+
+pkce <- rho:::rho_pkce()
+second_pkce <- rho:::rho_pkce()
+
+expect_equal(nchar(pkce$verifier), 43L)
+expect_equal(nchar(pkce$challenge), 43L)
+expect_true(grepl("^[A-Za-z0-9_-]+$", pkce$verifier))
+expect_true(grepl("^[A-Za-z0-9_-]+$", pkce$challenge))
+expect_true(grepl("^[0-9a-f]{32}$", pkce$state))
+expected_challenge <- digest::digest(
+  charToRaw(pkce$verifier),
+  algo = "sha256",
+  serialize = FALSE,
+  raw = TRUE
+)
+expected_challenge <- base64enc::base64encode(expected_challenge)
+expected_challenge <- sub("=+$", "", chartr("+/", "-_", expected_challenge))
+expect_equal(pkce$challenge, expected_challenge)
+expect_false(identical(pkce$verifier, second_pkce$verifier))
+expect_false(identical(pkce$state, second_pkce$state))
+expect_equal(rho:::rho_base64url_encode(charToRaw("foo?")), "Zm9vPw")
+expect_equal(rawToChar(rho:::rho_base64url_decode("Zm9vPw")), "foo?")
+
+expect_equal(
+  rho_supported_thinking_levels(spark),
+  c("off", "minimal", "low", "medium", "high", "xhigh")
+)
+expect_equal(rho_map_thinking_level(spark, "minimal"), "low")
+expect_equal(rho_clamp_thinking_level(spark, "max"), "xhigh")
+expect_true(rho_model_supports_input(spark, "text"))
+expect_false(rho_model_supports_input(spark, "image"))
+expect_true(rho_model_supports_transport(spark, WebSocketTransport()))
+transport_provider <- rho_openai_codex_provider()@implementation
+automatic_transport <- rho_select_provider_transport(
+  transport_provider,
+  spark,
+  AutomaticTransport()
+)
+required_websocket <- rho_select_provider_transport(
+  transport_provider,
+  spark,
+  WebSocketTransport()
+)
+expect_true(S7::S7_inherits(automatic_transport, ProviderTransportSelection))
+expect_true(S7::S7_inherits(automatic_transport@transport, WebSocketTransport))
+expect_true(S7::S7_inherits(required_websocket, ProviderTransportSelection))
+expect_equal(spark@pricing@cache_read, 0.175)
+expect_equal(spark@limits@context_window, 128000L)
+
+fixture_tool <- function(name) {
+  rho_tool_spec(
+    name = name,
+    description = name,
+    parameters = list(type = "object", properties = list()),
+    execute = function(...) NULL
+  )
+}
+loader <- fixture_tool("search_tools")
+weather <- fixture_tool("lookup_weather")
+loader_call <- rho_assistant_message(content = list(
+  ToolCall(id = "call_1", name = "search_tools", arguments = list())
+))
+loader_result <- rho_tool_result_message(
+  tool_call_id = "call_1",
+  tool_name = "search_tools",
+  content = list(rho_text("loaded")),
+  added_tool_names = "lookup_weather"
+)
+dynamic_context <- rho_context(
+  messages = list(loader_call, loader_result),
+  tools = list(loader, weather)
+)
+
+spark_placement <- rho_plan_tools(codex@implementation, spark, dynamic_context)
+expect_true(S7::S7_inherits(spark_placement, RhoFullToolPlacement))
+expect_equal(spark_placement@cache_expectation, "replace-prefix")
+expect_equal(
+  vapply(spark_placement@immediate, function(tool) tool@name, character(1)),
+  c("search_tools", "lookup_weather")
+)
+
+tool_search_model <- rho_openai_codex_model("gpt-5.3-codex-spark")
+tool_search_model@compatibility <- rho_openai_responses_compatibility(
+  supports_tool_search = TRUE
+)
+native_placement <- rho_plan_tools(codex@implementation, tool_search_model, dynamic_context)
+expect_true(S7::S7_inherits(native_placement, RhoOpenAIToolSearchPlacement))
+expect_equal(native_placement@cache_expectation, "preserve-prefix")
+expect_equal(native_placement@immediate[[1]]@name, "search_tools")
+expect_equal(native_placement@deferred[[1]]@name, "lookup_weather")
+
+native_request <- rho_build_provider_request(
+  codex@implementation,
+  tool_search_model,
+  dynamic_context,
+  options = list(auth = resolved_auth)
+)
+expect_equal(native_request@body$tools[[1]]$name, "search_tools")
+input_types <- vapply(native_request@body$input, `[[`, character(1), "type")
+expect_equal(
+  input_types,
+  c("function_call", "function_call_output", "tool_search_call", "tool_search_output")
+)
+expect_true(native_request@body$input[[4]]$tools[[1]]$defer_loading)
+
+decoder <- rho_openai_responses_decoder(spark)
+sse <- function(value) {
+  rho::RhoSseEvent(
+    event = "message",
+    data = yyjsonr::write_json_str(value, auto_unbox = TRUE),
+    id = "",
+    retry = NA_integer_
+  )
+}
+
+started <- rho_decode_provider_event(decoder, sse(list(
+  type = "response.output_item.added",
+  output_index = 0L,
+  item = list(type = "message", id = "msg_1", content = list())
+)))
+delta <- rho_decode_provider_event(decoder, sse(list(
+  type = "response.output_text.delta",
+  output_index = 0L,
+  delta = "hello"
+)))
+finished <- rho_decode_provider_event(decoder, sse(list(
+  type = "response.output_item.done",
+  output_index = 0L,
+  item = list(
+    type = "message",
+    id = "msg_1",
+    content = list(list(type = "output_text", text = "hello"))
+  )
+)))
+done <- rho_decode_provider_event(decoder, sse(list(
+  type = "response.completed",
+  response = list(
+    id = "resp_1",
+    status = "completed",
+    usage = list(
+      input_tokens = 10,
+      output_tokens = 4,
+      total_tokens = 14,
+      input_tokens_details = list(cached_tokens = 3, cache_write_tokens = 2),
+      output_tokens_details = list(reasoning_tokens = 1)
+    )
+  )
+)))
+events <- c(started, delta, finished, done)
+
+expect_equal(
+  vapply(events, rho_assistant_event_type, character(1)),
+  c("start", "text_start", "text_delta", "text_end", "done")
+)
+expect_equal(events[[5]]@message@content[[1]]@text, "hello")
+expect_equal(events[[5]]@message@model, "gpt-5.3-codex-spark")
+expect_equal(events[[5]]@message@response_id, "resp_1")
+expect_equal(events[[5]]@message@usage@input, 5)
+expect_equal(events[[5]]@message@usage@cache_read, 3)
+expect_equal(events[[5]]@message@usage@cache_write, 2)
+expect_equal(events[[5]]@message@usage@reasoning, 1)
+expect_equal(events[[5]]@message@usage@total, 14)
+expect_equal(
+  events[[5]]@message@usage@cost@total,
+  5 * 1.75e-6 + 3 * 0.175e-6 + 4 * 14e-6
+)
+expect_true(S7::S7_inherits(events[[3]], AssistantTextDeltaEvent))
+
+transport_events <- rho_decode_provider_event(
+  rho_openai_responses_decoder(spark),
+  rho::RhoHttpTransportError(
+    message = "connection closed",
+    url = "https://example.test/responses",
+    parent = simpleError("connection closed")
+  )
+)
+expect_equal(
+  vapply(transport_events, rho_assistant_event_type, character(1)),
+  c("start", "error")
+)
+expect_equal(transport_events[[2]]@error@kind, "transport")
+expect_true(transport_events[[2]]@error@retryable)
+
+status_events <- rho_decode_provider_event(
+  rho_openai_responses_decoder(spark),
+  rho::RhoHttpStatusError(
+    message = "HTTP stream returned status 429",
+    url = "https://example.test/responses",
+    status = 429L,
+    headers = list(`retry-after` = "1")
+  )
+)
+expect_equal(status_events[[2]]@error@code, "429")
+expect_true(status_events[[2]]@error@retryable)
+
+unsupported_events <- rho_decode_provider_event(rho_openai_responses_decoder(spark), list())
+expect_equal(unsupported_events[[2]]@error@code, "unsupported_event")
+expect_true(s7contract::implements(OpenAIResponseDecoder, ProviderEventDecoder))
+expect_true(s7contract::implements(OpenAIResponseTextDelta, ProviderWireEvent))
+expect_true(s7contract::implements(OpenAIMessageItem, ResponseItemProtocol))

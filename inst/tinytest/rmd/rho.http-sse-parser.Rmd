@@ -1,0 +1,68 @@
+---
+title: "SSE parser"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tinytest)
+library(rho)
+```
+
+```{r in-memory-tls}
+client <- rho_http_client()
+expect_true(inherits(client@tls, "tlsConfig"))
+
+certificate <- nanonext::write_cert()
+authenticated <- nanonext::tls_config(client = certificate$client)
+configured <- rho_http_client(tls = authenticated)
+expect_identical(configured@tls, authenticated)
+```
+
+```{r parse-basic-sse}
+events <- rho_sse_parse("event: delta\ndata: hello\nid: 1\n\ndata: done\n\n")
+expect_equal(length(events), 2)
+expect_equal(events[[1]]@event, "delta")
+expect_equal(events[[1]]@data, "hello")
+expect_equal(events[[1]]@id, "1")
+expect_equal(events[[2]]@event, "message")
+expect_equal(events[[2]]@data, "done")
+```
+
+```{r arbitrary-byte-splits}
+payload <- c(
+  as.raw(c(0xef, 0xbb, 0xbf)),
+  charToRaw(enc2utf8(paste0(
+  "event: delta\r\n",
+  "data: h\u00e9llo\r\n",
+  "id: first\r\n",
+  "\r\n",
+  "data: second\r",
+  "\r"
+  )))
+)
+decoder <- rho_sse_decoder()
+events <- list()
+for (byte in payload) {
+  events <- c(events, rho_sse_decode(decoder, as.raw(byte)))
+}
+events <- c(events, rho_sse_decode(decoder, final = TRUE))
+
+expect_equal(length(events), 2L)
+expect_equal(events[[1L]]@event, "delta")
+expect_equal(events[[1L]]@data, "h\u00e9llo")
+expect_equal(events[[1L]]@id, "first")
+expect_equal(events[[2L]]@data, "second")
+expect_equal(events[[2L]]@id, "first")
+```
+
+```{r event-dispatch-semantics}
+decoder <- rho_sse_decoder()
+expect_length(rho_sse_decode(decoder, "event: ignored\nid: retained\n\n"), 0L)
+event <- rho_sse_decode(decoder, "data: value\n\n")[[1L]]
+expect_equal(event@event, "message")
+expect_equal(event@id, "retained")
+
+decoder <- rho_sse_decoder()
+expect_length(rho_sse_decode(decoder, "data: incomplete", final = TRUE), 0L)
+expect_error(rho_sse_decode(decoder, "data: late\n\n"), "after it is finalized")
+```

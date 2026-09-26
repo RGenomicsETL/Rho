@@ -1,0 +1,241 @@
+---
+title: "Task contract"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tinytest)
+library(rho)
+```
+
+```{r task-probe}
+rho_task_probe <- function() {
+  state <- new.env(parent = emptyenv())
+  state$resolve <- NULL
+  state$reject <- NULL
+  state$cancel_reason <- NULL
+  promise <- promises::promise(function(resolve, reject) {
+    state$resolve <- resolve
+    state$reject <- reject
+  })
+  task <- rho_task_from_promise(
+    promise,
+    cancel = function(reason) state$cancel_reason <- reason,
+    label = "test-probe"
+  )
+  list(task = task, state = state)
+}
+```
+
+```{r immediate-task}
+t <- rho_task(42)
+expect_false(rho_pending(t))
+expect_equal(rho_await(t), 42)
+```
+
+```{r rejected-task}
+t <- rho_rejected("boom")
+expect_error(rho_await(t), "boom")
+```
+
+```{r then-chain}
+t <- rho_task(2)
+out <- rho_then(t, function(x) x + 3)
+expect_equal(rho_await(out), 5)
+```
+
+```{r function-task-state}
+t <- rho_task_from_function(function() 42)
+expect_true(rho_pending(t))
+expect_equal(rho_await(t, timeout = 1000L), 42)
+expect_false(rho_pending(t))
+expect_false(rho_cancel(t, reason = "too late"))
+expect_equal(rho_await(t, timeout = 1000L), 42)
+```
+
+```{r continuation-cancellation}
+observed <- new.env(parent = emptyenv())
+observed$reason <- NULL
+source <- rho_task_from_promise(
+  promises::promise(function(resolve, reject) NULL),
+  cancel = function(reason) observed$reason <- reason
+)
+continuation <- rho_then(source, identity)
+
+expect_true(rho_cancel(continuation, reason = "cancel continuation"))
+expect_equal(observed$reason, "cancel continuation")
+cancelled <- rho_await(continuation, timeout = 1000L)
+expect_true(S7::S7_inherits(cancelled, RhoCancellation))
+expect_equal(cancelled@message, "cancel continuation")
+expect_false(rho_pending(continuation))
+expect_false(rho_cancel(continuation, reason = "again"))
+```
+
+```{r source-cancellation-settles-continuation}
+source <- rho_task_probe()
+called <- FALSE
+continuation <- rho_then(source$task, function(value) {
+  called <<- TRUE
+  value
+})
+
+expect_true(rho_cancel(source$task, reason = "source cancelled"))
+cancelled <- rho_await(continuation, timeout = 1000L)
+expect_true(S7::S7_inherits(cancelled, RhoCancellation))
+expect_equal(cancelled@message, "source cancelled")
+expect_true(called)
+```
+
+```{r continuation-cancels-active-child}
+child <- rho_task_probe()
+continuation <- rho_then(rho_task("ready"), function(value) child$task)
+later::run_now(0.05)
+
+expect_true(rho_cancel(continuation, reason = "cancel child"))
+expect_equal(child$state$cancel_reason, "cancel child")
+cancelled <- rho_await(continuation, timeout = 1000L)
+expect_true(S7::S7_inherits(cancelled, RhoCancellation))
+```
+
+```{r all-cancellation}
+first <- rho_task_probe()
+second <- rho_task_probe()
+joined <- rho_all(list(first$task, second$task))
+
+expect_true(rho_cancel(joined, reason = "cancel group"))
+expect_equal(first$state$cancel_reason, "cancel group")
+expect_equal(second$state$cancel_reason, "cancel group")
+expect_true(S7::S7_inherits(
+  rho_await(joined, timeout = 1000L),
+  RhoCancellation
+))
+```
+
+```{r all-rejection-cancels-siblings}
+pending <- rho_task_probe()
+joined <- rho_all(list(rho_rejected("join failed"), pending$task))
+
+expect_error(rho_await(joined, timeout = 1000L), "join failed")
+expect_equal(pending$state$cancel_reason, "A task in rho_all() failed")
+```
+
+```{r race-cancels-losers}
+loser <- rho_task_probe()
+raced <- rho_race(list(rho_task("winner"), loser$task))
+
+expect_equal(rho_await(raced, timeout = 1000L), "winner")
+expect_equal(loser$state$cancel_reason, "Another task settled first")
+```
+
+```{r race-cancellation}
+first <- rho_task_probe()
+second <- rho_task_probe()
+raced <- rho_race(list(first$task, second$task))
+
+expect_true(rho_cancel(raced, reason = "cancel race"))
+expect_equal(first$state$cancel_reason, "cancel race")
+expect_equal(second$state$cancel_reason, "cancel race")
+expect_true(S7::S7_inherits(
+  rho_await(raced, timeout = 1000L),
+  RhoCancellation
+))
+expect_error(rho_race(list()), "non-empty list")
+```
+
+```{r timeout-cancels-source}
+source <- rho_task_probe()
+timed <- rho_timeout(source$task, 10L)
+result <- rho_await(timed, timeout = 1000L)
+
+expect_true(S7::S7_inherits(result, RhoTimeoutError))
+expect_equal(source$state$cancel_reason, "Task deadline elapsed")
+expect_false(rho_pending(source$task))
+```
+
+```{r poll-composition}
+attempts <- integer()
+polled <- rho_poll(function(attempt) {
+  attempts <<- c(attempts, attempt)
+  if (attempt < 3L) {
+    rho_poll_pending(1L)
+  } else {
+    rho_poll_complete("ready")
+  }
+}, timeout_ms = 1000L)
+
+expect_true(rho_pending(polled))
+expect_equal(rho_await(polled, timeout = 2000L), "ready")
+expect_equal(attempts, 1:3)
+```
+
+```{r serial-queue-order}
+queue <- rho_serial_queue()
+expect_true(s7contract::implements(RhoSerialQueue, RhoTaskQueue))
+first_result <- rho_task_probe()
+started <- character()
+
+first <- rho_enqueue(queue, function() {
+  started <<- c(started, "first")
+  first_result$task
+})
+second <- rho_enqueue(queue, function() {
+  started <<- c(started, "second")
+  "second-value"
+})
+later::run_now(0.05)
+
+expect_equal(started, "first")
+first_result$state$resolve("first-value")
+expect_equal(rho_await(first, timeout = 1000L), "first-value")
+expect_equal(rho_await(second, timeout = 1000L), "second-value")
+expect_equal(started, c("first", "second"))
+```
+
+```{r cancelling-queued-entry-preserves-active-entry}
+queue <- rho_serial_queue()
+active_result <- rho_task_probe()
+active <- rho_enqueue(queue, function() active_result$task)
+queued <- rho_enqueue(queue, function() "must not run")
+later::run_now(0.05)
+
+expect_true(rho_cancel(queued, reason = "drop queued"))
+expect_true(is.null(active_result$state$cancel_reason))
+active_result$state$resolve("active-value")
+expect_equal(rho_await(active, timeout = 1000L), "active-value")
+expect_true(S7::S7_inherits(
+  rho_await(queued, timeout = 1000L),
+  RhoCancellation
+))
+```
+
+```{r interactive-task-callback}
+ready <- new.env(parent = emptyenv())
+ready$value <- FALSE
+bridge <- rho_task_callback_bridge(
+  name = paste0("rho.async.test.", Sys.getpid())
+)
+started <- rho_await(rho_register_task_callback(bridge), timeout = 1000)
+on.exit({
+  if (S7::S7_inherits(started, RhoTaskCallbackBridge) && started@registered) {
+    rho_await(rho_remove_task_callback(started), timeout = 1000)
+  }
+}, add = TRUE)
+
+expect_true(S7::S7_inherits(started, RhoTaskCallbackBridge))
+expect_true(started@registered)
+expect_false(is.null(started@callback_id))
+
+later::later(function() ready$value <- TRUE, delay = 0)
+started@manager$evaluate(quote(NULL), NULL, TRUE, FALSE)
+
+expect_true(ready$value)
+expect_equal(started@observations$invocations, 1L)
+expect_true(S7::S7_inherits(
+  started@observations$last_result,
+  RhoEventPumpProgress
+))
+
+stopped <- rho_await(rho_remove_task_callback(started), timeout = 1000)
+started <- stopped
+expect_false(stopped@registered)
+```

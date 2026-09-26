@@ -1,0 +1,14 @@
+---
+title: "Testkit"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tinytest)
+library(rho)
+```
+
+```{r expect-resolves}
+value <- rho:::expect_resolves(rho_task(1), 1)
+expect_equal(value, 1)
+```

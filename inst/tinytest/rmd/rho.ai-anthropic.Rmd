@@ -1,0 +1,631 @@
+---
+title: "Anthropic Messages provider"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tinytest)
+library(rho)
+```
+
+```{r provider-catalog}
+provider <- rho_anthropic_provider()
+fable <- rho_anthropic_model("claude-fable-5")
+opus_46 <- rho_anthropic_model("claude-opus-4-6")
+opus_48 <- rho_anthropic_model("claude-opus-4-8")
+
+expect_true(S7::S7_inherits(provider, RhoProvider))
+expect_true(S7::S7_inherits(provider@implementation, AnthropicApi))
+expect_true(S7::S7_inherits(provider@auth@api_key, AnthropicApiKeyAuth))
+expect_true(S7::S7_inherits(provider@auth@oauth, AnthropicOAuthAuth))
+expect_true(S7::S7_inherits(fable, AnthropicMessagesModel))
+expect_true(S7::S7_inherits(
+  fable@compatibility@thinking,
+  AnthropicAdaptiveThinkingCapability
+))
+expect_true(S7::S7_inherits(
+  opus_46@compatibility@thinking,
+  AnthropicAdaptiveThinkingCapability
+))
+expect_true(S7::S7_inherits(
+  opus_48@compatibility@temperature,
+  AnthropicTemperatureOmitted
+))
+expect_true(S7::S7_inherits(
+  fable@compatibility@web_search,
+  AnthropicWebSearch20260209
+))
+expect_true(S7::S7_inherits(
+  rho_anthropic_model("claude-haiku-4-5")@compatibility@web_search,
+  AnthropicWebSearch20250305
+))
+expect_true(length(provider@models) > 1L)
+```
+
+```{r typed-request-sections}
+tool <- rho_tool_spec(
+  name = "lookup",
+  description = "Look up a value",
+  parameters = list(
+    type = "object",
+    properties = list(value = list(type = "string")),
+    required = "value"
+  ),
+  execute = function(...) NULL
+)
+context <- rho_context(
+  system_prompt = "Use the tool when needed.",
+  messages = list(rho_user_message("hello")),
+  tools = list(tool)
+)
+placement <- rho_plan_tools(provider, fable, context)
+sections <- rho_anthropic_request_sections(
+  fable,
+  context,
+  placement,
+  options = list(reasoning_effort = rho_thinking_level("high"))
+)
+body <- rho_anthropic_messages_body(
+  fable,
+  context,
+  placement,
+  options = list(
+    reasoning_effort = rho_thinking_level("high"),
+    metadata = list(user_id = "reader-1")
+  )
+)
+
+expect_true(all(vapply(
+  sections,
+  function(section) S7::S7_inherits(section, AnthropicRequestSection),
+  logical(1)
+)))
+expect_true(s7contract::implements(
+  S7::S7_class(sections[[1L]]),
+  ProviderRequestSectionProtocol
+))
+expect_equal(body$model, "claude-fable-5")
+expect_equal(body$messages[[1L]]$role, "user")
+expect_equal(body$system[[1L]]$text, "Use the tool when needed.")
+expect_equal(body$tools[[1L]]$name, "lookup")
+expect_identical(body$tools[[1L]]$eager_input_streaming, TRUE)
+expect_equal(body$thinking$type, "adaptive")
+expect_equal(body$thinking$display, "summarized")
+expect_equal(body$output_config$effort, "high")
+expect_equal(body$metadata$user_id, "reader-1")
+expect_equal(body$system[[1L]]$cache_control$type, "ephemeral")
+expect_equal(body$messages[[1L]]$content[[1L]]$cache_control$type, "ephemeral")
+expect_equal(body$tools[[1L]]$cache_control$type, "ephemeral")
+
+temperature_error <- rho_anthropic_messages_body(
+  fable,
+  context,
+  placement,
+  options = list(temperature = 0.2)
+)
+expect_true(S7::S7_inherits(temperature_error, ProviderOperationUnsupported))
+expect_equal(temperature_error@operation, "anthropic_temperature")
+```
+
+```{r hosted-web-search-operation}
+search <- rho_web_search(
+  domains = rho_web_search_blocked_domains("example.invalid"),
+  location = rho_approximate_location(country = "DE", region = "Berlin")
+)
+search_context <- rho_context(
+  messages = list(rho_user_message("Find the current R release.")),
+  tools = list(tool),
+  operations = list(search)
+)
+unbound_search <- rho_anthropic_messages_body(
+  fable,
+  search_context,
+  rho_plan_tools(provider, fable, search_context)
+)
+search_plan <- rho_plan_operations(provider, fable, search_context)
+search_support <- rho_provider_support(provider, fable, search)
+search_body <- rho_anthropic_messages_body(
+  fable,
+  search_context,
+  rho_plan_tools(provider, fable, search_context),
+  options = list(
+    operation_plan = search_plan,
+    cache_retention = rho_anthropic_no_cache()
+  )
+)
+
+expect_true(S7::S7_inherits(unbound_search, ProviderErrorValue))
+expect_equal(unbound_search@code, "operation_plan_required")
+expect_true(search_support@supported)
+expect_true(S7::S7_inherits(search_plan@bindings[[1L]], AnthropicWebSearchBinding))
+expect_equal(search_body$tools[[1L]]$name, "lookup")
+expect_equal(search_body$tools[[2L]]$type, "web_search_20260209")
+expect_equal(search_body$tools[[2L]]$name, "web_search")
+expect_equal(search_body$tools[[2L]]$blocked_domains, "example.invalid")
+expect_equal(search_body$tools[[2L]]$user_location$country, "DE")
+expect_equal(search_body$tools[[2L]]$user_location$region, "Berlin")
+```
+
+```{r hosted-web-search-events}
+search_decoder <- rho_anthropic_messages_decoder(fable)
+anthropic_event <- function(value) {
+  rho::RhoSseEvent(
+    event = "message",
+    data = yyjsonr::write_json_str(value, auto_unbox = TRUE),
+    id = "",
+    retry = NA_integer_
+  )
+}
+
+begin <- rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "message_start",
+  message = list(id = "message-search", usage = list())
+)))
+call_start <- rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "content_block_start",
+  index = 0L,
+  content_block = list(
+    type = "server_tool_use",
+    id = "server_search_1",
+    name = "web_search",
+    input = list(query = "current R release")
+  )
+)))
+call_end <- rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "content_block_stop",
+  index = 0L
+)))
+result_start <- rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "content_block_start",
+  index = 1L,
+  content_block = list(
+    type = "web_search_tool_result",
+    tool_use_id = "server_search_1",
+    content = list(list(
+      type = "web_search_result",
+      url = "https://www.r-project.org/",
+      title = "The R Project",
+      page_age = "2026-07-01",
+      encrypted_content = "opaque"
+    ))
+  )
+)))
+result_end <- rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "content_block_stop",
+  index = 1L
+)))
+rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "message_delta",
+  delta = list(stop_reason = "end_turn"),
+  usage = list(output_tokens = 10L)
+)))
+done <- rho_decode_provider_event(search_decoder, anthropic_event(list(
+  type = "message_stop"
+)))
+
+operation_events <- c(call_start, call_end, result_start, result_end)
+expect_equal(
+  vapply(operation_events, rho_assistant_event_type, character(1)),
+  c("operation_start", "operation_end", "operation_start", "operation_end")
+)
+message <- done[[1L]]@message
+expect_true(S7::S7_inherits(message@content[[1L]], WebSearchCallContent))
+expect_false(S7::S7_inherits(message@content[[1L]], ToolCall))
+expect_true(S7::S7_inherits(message@content[[1L]]@status, OperationCompleted))
+expect_true(S7::S7_inherits(message@content[[2L]], WebSearchResultContent))
+expect_equal(message@content[[2L]]@results[[1L]]@title, "The R Project")
+
+history <- rho_context(messages = list(
+  rho_user_message("Find it."),
+  message
+))
+history_body <- rho_anthropic_messages_body(
+  fable,
+  history,
+  rho_plan_tools(provider, fable, history),
+  options = list(cache_retention = rho_anthropic_no_cache())
+)
+expect_equal(history_body$messages[[2L]]$content[[1L]]$type, "server_tool_use")
+expect_equal(history_body$messages[[2L]]$content[[2L]]$type, "web_search_tool_result")
+expect_equal(
+  history_body$messages[[2L]]$content[[2L]]$content[[1L]]$title,
+  "The R Project"
+)
+expect_equal(vapply(begin, rho_assistant_event_type, character(1)), "start")
+```
+
+```{r thinking-and-message-semantics}
+budget_model <- rho_anthropic_model("claude-sonnet-4-5")
+budget_placement <- rho_plan_tools(provider, budget_model, context)
+budget_body <- rho_anthropic_messages_body(
+  budget_model,
+  context,
+  budget_placement,
+  options = list(
+    max_tokens = 2048L,
+    reasoning_effort = rho_thinking_level("medium")
+  )
+)
+
+expect_equal(budget_body$max_tokens, 10240L)
+expect_equal(budget_body$thinking$type, "enabled")
+expect_equal(budget_body$thinking$budget_tokens, 8192L)
+
+signed <- rho_assistant_message(content = list(
+  rho_thinking("reason", signature = "opaque-signature"),
+  ToolCall(id = "call:1", name = "lookup", arguments = list(value = "x"))
+))
+results <- list(
+  rho_tool_result_message("call:1", "lookup", list(rho_text("one"))),
+  rho_tool_result_message("call:2", "lookup", list(rho_text("two")))
+)
+translated <- rho_anthropic_messages_body(
+  budget_model,
+  rho_context(messages = c(list(rho_user_message("begin"), signed), results)),
+  rho_plan_tools(provider, budget_model, rho_context()),
+  options = list(cache_retention = rho_anthropic_no_cache())
+)
+
+expect_equal(translated$messages[[2L]]$content[[1L]]$type, "thinking")
+expect_equal(translated$messages[[2L]]$content[[1L]]$signature, "opaque-signature")
+expect_equal(translated$messages[[2L]]$content[[2L]]$id, "call_1")
+expect_equal(length(translated$messages[[3L]]$content), 2L)
+expect_equal(translated$messages[[3L]]$content[[1L]]$type, "tool_result")
+
+long_cache_error <- rho_anthropic_cache_control(
+  AnthropicCacheCapability(long_retention = FALSE, tools = TRUE),
+  rho_anthropic_long_cache()
+)
+expect_true(S7::S7_inherits(long_cache_error, ProviderOperationUnsupported))
+```
+
+```{r explicit-login}
+prompts <- list()
+io <- rho_login_io(prompt = function(prompt) {
+  prompts[[length(prompts) + 1L]] <<- prompt
+  "entered-anthropic-key"
+})
+credential <- rho_auth_login(provider@auth@api_key, "anthropic", io) |>
+  rho_await(timeout = 1000L)
+
+expect_true(S7::S7_inherits(credential, RhoApiKeyCredential))
+expect_true(S7::S7_inherits(prompts[[1L]], RhoSecretAuthPrompt))
+expect_equal(credential@provider, "anthropic")
+```
+
+```{r subscription-oauth}
+token_requests <- list()
+server <- nanonext::http_server(
+  "http://127.0.0.1:0",
+  handlers = list(nanonext::handler(
+    "/token",
+    function(request) {
+      body <- yyjsonr::read_json_str(
+        rawToChar(request$body),
+        arr_of_objs_to_df = FALSE,
+        obj_of_arrs_to_df = FALSE
+      )
+      token_requests[[length(token_requests) + 1L]] <<- body
+      suffix <- if (identical(body$grant_type, "authorization_code")) "login" else "refresh"
+      list(
+        status = 200L,
+        headers = c("Content-Type" = "application/json"),
+        body = yyjsonr::write_json_str(list(
+          access_token = paste0("subscription-access-", suffix),
+          refresh_token = paste0("subscription-refresh-", suffix),
+          expires_in = 3600L
+        ), auto_unbox = TRUE)
+      )
+    },
+    method = "POST"
+  ))
+)
+expect_equal(server$start(), 0L)
+
+oauth <- rho_anthropic_oauth_auth(
+  authorize_url = "https://claude.example/authorize",
+  token_url = paste0(server$url, "/token"),
+  http = rho::rho_http_client(timeout_ms = 2000L)
+)
+authorization <- NULL
+redirect_uri <- "http://localhost:53692/callback"
+oauth_io <- rho_login_io(
+  prompt = function(prompt) {
+    query <- sub("^[^?]*\\?", "", authorization@url)
+    fields <- strsplit(query, "&", fixed = TRUE)[[1L]]
+    state_field <- fields[startsWith(fields, "state=")][[1L]]
+    state <- utils::URLdecode(sub("^state=", "", state_field))
+    paste0(redirect_uri, "?code=manual-code&state=", state)
+  },
+  notify = function(event) {
+    authorization <<- event
+    NULL
+  }
+)
+subscription <- rho_auth_login(oauth, "anthropic", oauth_io) |>
+  rho_await(timeout = 2000L)
+
+expect_true(S7::S7_inherits(subscription, AnthropicOAuthCredential))
+expect_true(S7::S7_inherits(authorization, RhoAuthUrlEvent))
+expect_equal(token_requests[[1L]]$grant_type, "authorization_code")
+expect_equal(token_requests[[1L]]$redirect_uri, redirect_uri)
+expect_true(nzchar(token_requests[[1L]]$code_verifier))
+
+refreshed <- rho_auth_refresh(oauth, subscription) |>
+  rho_await(timeout = 2000L)
+expect_true(S7::S7_inherits(refreshed, AnthropicOAuthCredential))
+expect_equal(token_requests[[2L]]$grant_type, "refresh_token")
+expect_true(is.null(token_requests[[2L]]$scope))
+
+model_auth <- rho_auth_to_request(oauth, refreshed) |>
+  rho_await(timeout = 2000L)
+oauth_request <- rho_anthropic_messages_request(
+  provider@implementation,
+  fable,
+  rho_context(
+    system_prompt = "Project instructions.",
+    messages = list(rho_user_message("hello"))
+  ),
+  options = list(auth = model_auth)
+)
+expect_true(S7::S7_inherits(model_auth, AnthropicOAuthModelAuth))
+expect_equal(
+  oauth_request@headers$Authorization,
+  paste("Bearer", refreshed@state$access)
+)
+expect_true(is.null(oauth_request@headers$`x-api-key`))
+expect_true(grepl("oauth-2025-04-20", oauth_request@headers$`anthropic-beta`, fixed = TRUE))
+expect_equal(
+  oauth_request@body$system[[1L]]$text,
+  "You are Claude Code, Anthropic's official CLI for Claude."
+)
+expect_equal(oauth_request@body$system[[2L]]$text, "Project instructions.")
+
+oauth_tool <- rho_tool_spec(
+  name = "bash",
+  description = "Run a command",
+  parameters = list(type = "object"),
+  execute = function(...) NULL
+)
+oauth_tool_request <- rho_anthropic_messages_request(
+  provider@implementation,
+  fable,
+  rho_context(
+    messages = list(
+      rho_user_message("run it"),
+      rho_assistant_message(content = list(
+        ToolCall(id = "call-1", name = "bash", arguments = list())
+      ))
+    ),
+    tools = list(oauth_tool)
+  ),
+  options = list(auth = model_auth)
+)
+expect_equal(oauth_tool_request@body$tools[[1L]]$name, "Bash")
+expect_equal(
+  oauth_tool_request@body$messages[[2L]]$content[[1L]]$name,
+  "Bash"
+)
+tool_names <- rho_anthropic_tool_name_policy(model_auth)
+expect_equal(rho_anthropic_tool_name(tool_names, "bash"), "Bash")
+expect_equal(rho_anthropic_local_tool_name(tool_names, "Bash", "bash"), "bash")
+
+decoder <- rho_anthropic_messages_decoder(
+  fable,
+  tool_names = tool_names,
+  tools = list(oauth_tool)
+)
+wire_event <- function(value) {
+  rho::RhoSseEvent(
+    event = "message",
+    data = yyjsonr::write_json_str(value, auto_unbox = TRUE),
+    id = "",
+    retry = NA_integer_
+  )
+}
+rho_decode_provider_event(decoder, wire_event(list(
+  type = "message_start",
+  message = list(id = "message-1", usage = list())
+)))
+tool_events <- rho_decode_provider_event(decoder, wire_event(list(
+  type = "content_block_start",
+  index = 0L,
+  content_block = list(
+    type = "tool_use",
+    id = "call-1",
+    name = "Bash",
+    input = list()
+  )
+)))
+expect_equal(tool_events[[1L]]@name, "bash")
+expect_equal(tool_events[[1L]]@partial@content[[1L]]@name, "bash")
+
+credential_path <- tempfile(fileext = ".json")
+writeLines(
+  yyjsonr::write_json_str(list(anthropic = list(
+    type = "oauth",
+    access = "imported-access",
+    refresh = "imported-refresh",
+    expires = 9999999999999
+  )), auto_unbox = TRUE),
+  credential_path
+)
+imported <- rho_load_anthropic_credential(credential_path) |>
+  rho_await(timeout = 2000L)
+expect_true(S7::S7_inherits(imported, AnthropicOAuthCredential))
+expect_equal(imported@source, normalizePath(credential_path, winslash = "/"))
+unlink(credential_path)
+expect_equal(server$close(), 0L)
+```
+
+```{r normalized-response-stream}
+received_headers <- NULL
+received_body <- NULL
+server_connection <- NULL
+server <- nanonext::http_server(
+  "http://127.0.0.1:0",
+  handlers = list(nanonext::handler_stream(
+    "/v1/messages",
+    function(connection, request) {
+      server_connection <<- connection
+      received_headers <<- request$headers
+      received_body <<- yyjsonr::read_json_str(
+        rawToChar(request$body),
+        arr_of_objs_to_df = FALSE,
+        obj_of_arrs_to_df = FALSE
+      )
+      values <- list(
+        list(
+          type = "message_start",
+          message = list(
+            id = "msg_1",
+            usage = list(
+              input_tokens = 8,
+              cache_read_input_tokens = 2,
+              cache_creation_input_tokens = 3,
+              output_tokens = 1
+            )
+          )
+        ),
+        list(
+          type = "content_block_start",
+          index = 0L,
+          content_block = list(type = "text", text = "")
+        ),
+        list(
+          type = "content_block_delta",
+          index = 0L,
+          delta = list(type = "text_delta", text = "hello from anthropic")
+        ),
+        list(type = "content_block_stop", index = 0L),
+        list(
+          type = "message_delta",
+          delta = list(stop_reason = "end_turn"),
+          usage = list(output_tokens = 4)
+        ),
+        list(type = "message_stop")
+      )
+      connection$set_status(200L)
+      connection$set_header("Content-Type", "text/event-stream")
+      for (value in values) {
+        connection$send(nanonext::format_sse(
+          data = yyjsonr::write_json_str(value, auto_unbox = TRUE)
+        ))
+      }
+      connection$close()
+    }
+  ))
+)
+expect_equal(server$start(), 0L)
+
+live_provider <- rho_anthropic_provider(
+  base_url = server$url,
+  http = rho::rho_http_client(timeout_ms = 2000L)
+)
+live_models <- rho_models(
+  list(live_provider),
+  rho_memory_credential_store(list(
+    anthropic = rho_api_key_credential("anthropic", "anthropic-test-key")
+  ))
+)
+events <- rho_stream(
+  live_models,
+  fable,
+  rho_context("Answer directly.", list(rho_user_message("hello"))),
+  options = list(reasoning_effort = rho_thinking_level("high"))
+) |>
+  rho_stream_collect(timeout = 2000L)
+
+expect_equal(
+  vapply(events, rho_assistant_event_type, character(1)),
+  c("start", "text_start", "text_delta", "text_end", "done")
+)
+terminal <- events[[length(events)]]
+expect_equal(terminal@message@content[[1L]]@text, "hello from anthropic")
+expect_equal(terminal@message@response_id, "msg_1")
+expect_true(S7::S7_inherits(terminal@message@usage, ProviderUsage))
+expect_equal(terminal@message@usage@input, 8)
+expect_equal(terminal@message@usage@cache_read, 2)
+expect_equal(terminal@message@usage@cache_write, 3)
+expect_equal(terminal@message@usage@output, 4)
+expect_equal(received_headers[["x-api-key"]], "anthropic-test-key")
+expect_equal(received_body$model, "claude-fable-5")
+expect_equal(received_body$thinking$type, "adaptive")
+expect_equal(server$close(), 0L)
+server_connection <- NULL
+```
+
+```{r structured-request-size-error}
+request_size_events <- rho_decode_provider_event(
+  rho_anthropic_messages_decoder(fable),
+  rho::RhoHttpStatusError(
+    message = "HTTP stream returned status 413",
+    url = "https://example.test/v1/messages",
+    status = 413L,
+    headers = list(`content-type` = "application/json"),
+    body = charToRaw(yyjsonr::write_json_str(list(
+      type = "error",
+      error = list(
+        type = "request_too_large",
+        message = "Request exceeds maximum size"
+      )
+    ), auto_unbox = TRUE))
+  )
+)
+request_size <- request_size_events[[length(request_size_events)]]@error
+
+expect_true(S7::S7_inherits(request_size, ProviderRequestTooLargeError))
+expect_true(S7::S7_inherits(request_size, ProviderInputLimitError))
+expect_equal(request_size@code, "request_too_large")
+```
+
+```{r copilot-anthropic-dialect}
+copilot <- rho_github_copilot_provider()
+copilot_model <- rho_github_copilot_model("claude-opus-4.7")
+copilot_fine_grained <- rho_github_copilot_model("claude-sonnet-4.5")
+dialect <- rho_provider_dialect(copilot@implementation, copilot_model)
+copilot_request <- rho_build_provider_request(
+  copilot,
+  copilot_model,
+  rho_context(messages = list(rho_user_message("hello"))),
+  options = list(auth = rho_model_auth(
+    api_key = "copilot-token",
+    base_url = "https://example.test"
+  ))
+)
+fine_grained_request <- rho_build_provider_request(
+  copilot,
+  copilot_fine_grained,
+  rho_context(
+    messages = list(rho_user_message("hello")),
+    tools = list(tool)
+  ),
+  options = list(auth = rho_model_auth(
+    api_key = "copilot-token",
+    base_url = "https://example.test"
+  ))
+)
+
+expect_true(S7::S7_inherits(copilot_model, AnthropicMessagesModel))
+expect_true(s7contract::implements(
+  S7::S7_class(dialect),
+  AnthropicMessagesEndpoint
+))
+expect_true(any(vapply(
+  copilot@models,
+  function(model) identical(model@id, copilot_model@id),
+  logical(1)
+)))
+expect_equal(copilot_request@url, "https://example.test/v1/messages")
+expect_equal(copilot_request@headers$Authorization, "Bearer copilot-token")
+expect_true(S7::S7_inherits(
+  copilot_fine_grained@compatibility@tool_input,
+  AnthropicFineGrainedToolInput
+))
+expect_true(grepl(
+  "fine-grained-tool-streaming",
+  fine_grained_request@headers$`anthropic-beta`,
+  fixed = TRUE
+))
+expect_true(is.null(fine_grained_request@body$tools[[1L]]$eager_input_streaming))
+```

@@ -1,7 +1,0 @@
-^Makefile$
-^_pkgdown\\.yml$
-^README\\.Rmd$
-^README\\.html$
-^docs$
-^.*\\.Rcheck$
-^.*\\.tar\\.gz$

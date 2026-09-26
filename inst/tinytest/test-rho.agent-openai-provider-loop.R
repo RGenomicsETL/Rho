@@ -1,0 +1,219 @@
+# Generated from inst/tinytest/rmd/rho.agent-openai-provider-loop.Rmd; do not edit.
+
+library(tinytest)
+library(rho)
+
+server <- nanonext::http_server(
+  "http://127.0.0.1:0",
+  handlers = list(nanonext::handler_stream(
+    "/responses",
+    function(connection, request) {
+      values <- list(
+        list(
+          type = "response.output_item.added",
+          output_index = 0L,
+          item = list(type = "message", id = "msg_1", content = list())
+        ),
+        list(
+          type = "response.output_text.delta",
+          output_index = 0L,
+          delta = "agent response"
+        ),
+        list(
+          type = "response.output_item.done",
+          output_index = 0L,
+          item = list(
+            type = "message",
+            id = "msg_1",
+            content = list(list(type = "output_text", text = "agent response"))
+          )
+        ),
+        list(
+          type = "response.completed",
+          response = list(
+            id = "resp_1",
+            status = "completed",
+            usage = list(input_tokens = 2, output_tokens = 2, total_tokens = 4)
+          )
+        )
+      )
+      connection$set_status(200L)
+      connection$set_header("Content-Type", "text/event-stream")
+      for (value in values) {
+        connection$send(nanonext::format_sse(
+          data = yyjsonr::write_json_str(value, auto_unbox = TRUE)
+        ))
+      }
+      connection$close()
+    }
+  ))
+)
+expect_equal(server$start(), 0L)
+
+provider <- rho_openai_provider(
+  base_url = server$url,
+  http = rho::rho_http_client(timeout_ms = 2000L)
+)
+models <- rho_models(
+  list(provider),
+  rho_memory_credential_store(list(
+    openai = rho_api_key_credential("openai", "agent-test-key")
+  ))
+)
+agent <- rho_agent(
+  provider = models,
+  model = rho_openai_model("gpt-5.4")
+)
+result <- rho_prompt(agent, "hello") |>
+  rho_await(timeout = 3000L)
+
+expect_equal(result@status, "completed")
+expect_equal(result@messages[[2L]]@content[[1L]]@text, "agent response")
+expect_equal(result@messages[[2L]]@response_id, "resp_1")
+expect_equal(result@messages[[2L]]@usage@total, 4)
+expect_equal(server$close(), 0L)
+
+RhoOpenAICompactionFixture <- S7::new_class(
+  "RhoOpenAICompactionFixture",
+  parent = RhoCompactor,
+  properties = list(state = S7::class_environment)
+)
+
+S7::method(
+  rho_compact_preparation,
+  list(RhoOpenAICompactionFixture, RhoCompactionPreparation)
+) <- function(
+  compactor,
+  preparation,
+  agent,
+  custom_instructions = "",
+  ...
+) {
+  compactor@state$calls <- compactor@state$calls + 1L
+  rho_task(rho_compaction_result(
+    summary = "OpenAI fixture context checkpoint",
+    first_kept_entry_id = preparation@first_kept_entry_id,
+    tokens_before = preparation@tokens_before,
+    source = RhoProvidedCompaction()
+  ))
+}
+
+request_count <- 0L
+rho_send_openai_fixture_response <- function(connection, text, id) {
+  values <- list(
+    list(
+      type = "response.output_item.added",
+      output_index = 0L,
+      item = list(type = "message", id = id, content = list())
+    ),
+    list(
+      type = "response.output_text.delta",
+      output_index = 0L,
+      delta = text
+    ),
+    list(
+      type = "response.output_item.done",
+      output_index = 0L,
+      item = list(
+        type = "message",
+        id = id,
+        content = list(list(type = "output_text", text = text))
+      )
+    ),
+    list(
+      type = "response.completed",
+      response = list(
+        id = id,
+        status = "completed",
+        usage = list(input_tokens = 20, output_tokens = 2, total_tokens = 22)
+      )
+    )
+  )
+  connection$set_status(200L)
+  connection$set_header("Content-Type", "text/event-stream")
+  for (value in values) {
+    connection$send(nanonext::format_sse(
+      data = yyjsonr::write_json_str(value, auto_unbox = TRUE)
+    ))
+  }
+  connection$close()
+}
+
+server <- nanonext::http_server(
+  "http://127.0.0.1:0",
+  handlers = list(nanonext::handler_stream(
+    "/responses",
+    function(connection, request) {
+      request_count <<- request_count + 1L
+      if (request_count == 3L) {
+        connection$set_status(400L)
+        connection$set_header("Content-Type", "application/json")
+        connection$send(yyjsonr::write_json_str(list(error = list(
+          message = "Maximum context length exceeded",
+          type = "invalid_request_error",
+          param = "input",
+          code = "context_length_exceeded"
+        )), auto_unbox = TRUE))
+        connection$close()
+        return()
+      }
+      text <- if (request_count == 4L) "recovered response" else "history response"
+      rho_send_openai_fixture_response(
+        connection,
+        text,
+        paste0("response-", request_count)
+      )
+    }
+  ))
+)
+expect_equal(server$start(), 0L)
+
+provider <- rho_openai_provider(
+  base_url = server$url,
+  http = rho::rho_http_client(timeout_ms = 2000L)
+)
+models <- rho_models(
+  list(provider),
+  rho_memory_credential_store(list(
+    openai = rho_api_key_credential("openai", "agent-test-key")
+  ))
+)
+compactor_state <- new.env(parent = emptyenv())
+compactor_state$calls <- 0L
+agent <- rho_agent(
+  provider = models,
+  model = rho_openai_model("gpt-5.4"),
+  compaction = rho_compaction_settings(FALSE, 100L, 5L),
+  compactor = RhoOpenAICompactionFixture(state = compactor_state)
+)
+rho_prompt(agent, paste(rep("history-a", 80L), collapse = " ")) |>
+  rho_await(timeout = 3000L)
+rho_prompt(agent, paste(rep("history-b", 80L), collapse = " ")) |>
+  rho_await(timeout = 3000L)
+result <- rho_prompt(agent, "recover this request") |>
+  rho_await(timeout = 5000L)
+
+expect_equal(result@status, "completed")
+expect_equal(request_count, 4L)
+expect_equal(compactor_state$calls, 1L)
+expect_equal(
+  result@messages[[length(result@messages)]]@content[[1L]]@text,
+  "recovered response"
+)
+compaction_events <- Filter(
+  function(event) {
+    S7::S7_inherits(event, RhoCompactionStartEvent) ||
+      S7::S7_inherits(event, RhoCompactionEndEvent)
+  },
+  result@events
+)
+expect_equal(length(compaction_events), 2L)
+expect_true(S7::S7_inherits(
+  compaction_events[[1L]]@reason,
+  RhoProviderInputLimitCompaction
+))
+expect_true(S7::S7_inherits(
+  compaction_events[[2L]]@outcome,
+  RhoCompactionResult
+))
+expect_equal(server$close(), 0L)

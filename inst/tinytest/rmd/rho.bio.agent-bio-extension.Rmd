@@ -1,0 +1,17 @@
+---
+title: "Bio extension"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tinytest)
+library(rho)
+```
+
+```{r register-tool}
+reg <- rho_bio_registry()
+rt <- rho_extension_runtime()
+api <- rho_extension_api(rt)
+rho_register_bio_extension(api, reg)
+expect_true(exists("bio_describe_manifest", rt@state$tools, inherits = FALSE))
+```

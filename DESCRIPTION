@@ -1,0 +1,115 @@
+Package: rho
+Type: Package
+Title: Asynchronous R Agent and Bioinformatics Substrate
+Version: 0.0.1.9001
+Authors@R:
+    person(given = "Sounkou Mahamane", family = "Toure",
+           email = "sounkoutoure@gmail.com", role = c("aut", "cre"))
+Description: Defines asynchronous tasks, streams, HTTP and provider protocols,
+    agent and extension runtimes, compute and transport backends, coding tools,
+    graphics artifacts, and declared bioinformatics resources in one package.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.4.0)
+Roxygen: list(markdown = TRUE)
+Imports:
+    S7, s7contract, nanonext (>= 1.10.2.9001), coro, later, promises,
+    yyjsonr, digest, base64enc, keyring, rmonocypher, processx, filelock,
+    grDevices, utils
+Suggests:
+    DBI, duckdb, mirai, httr2, curl, tinytest, knitr, rmarkdown,
+    ggplot2, svglite, ragg
+Remotes:
+    RGenomicsETL/nanonext@084c8eb82a35c38b2aaf7dd203414829c2bd8011
+URL: https://github.com/RGenomicsETL/Rho, https://rgenomicsetl.github.io/Rho/
+BugReports: https://github.com/RGenomicsETL/Rho/issues
+Config/roxygen2/version: 8.0.0
+Collate:
+    'rho.async-00-utils.R'
+    'rho.async-01-classes.R'
+    'rho.async-02-generics.R'
+    'rho.async-03-tasks.R'
+    'rho.async-04-streams.R'
+    'rho.async-05-interfaces.R'
+    'rho.async-06-task-callbacks.R'
+    'rho.async-07-serial-queue.R'
+    'rho.async-api.R'
+    'rho.http-00-utils.R'
+    'rho.http-01-classes.R'
+    'rho.http-02-http.R'
+    'rho.http-02-interfaces.R'
+    'rho.http-03-sse.R'
+    'rho.http-04-streams.R'
+    'rho.http-05-websocket.R'
+    'rho.http-api.R'
+    'rho.ai-00-utils.R'
+    'rho.ai-01-classes.R'
+    'rho.ai-02-constructors.R'
+    'rho.ai-03-generics-methods.R'
+    'rho.ai-04-context-revision.R'
+    'rho.ai-04-interfaces.R'
+    'rho.ai-04-usage-summary.R'
+    'rho.ai-05-auth.R'
+    'rho.ai-05-credential-security.R'
+    'rho.ai-05-model-capabilities.R'
+    'rho.ai-05-model-catalog.R'
+    'rho.ai-05-provider-faux.R'
+    'rho.ai-05-provider-protocols.R'
+    'rho.ai-06-openai-responses-request.R'
+    'rho.ai-06-provider-openai.R'
+    'rho.ai-07-anthropic-request.R'
+    'rho.ai-07-provider-anthropic.R'
+    'rho.ai-08-anthropic-events.R'
+    'rho.ai-08-provider-ollama.R'
+    'rho.ai-09-provider-openai-codex.R'
+    'rho.ai-10-openai-responses-events.R'
+    'rho.ai-11-provider-github-copilot.R'
+    'rho.ai-12-openai-chat-events.R'
+    'rho.ai-13-provider-zai.R'
+    'rho.ai-14-provider-transports.R'
+    'rho.ai-15-provider-kimi.R'
+    'rho.ai-16-provider-kimi-platform.R'
+    'rho.ai-17-provider-embedded.R'
+    'rho.ai-api.R'
+    'rho.agent-00-utils.R'
+    'rho.agent-01-classes.R'
+    'rho.agent-02-agent.R'
+    'rho.agent-03-assistant.R'
+    'rho.agent-04-interfaces.R'
+    'rho.agent-04-tools.R'
+    'rho.agent-05-loop.R'
+    'rho.agent-06-session.R'
+    'rho.agent-07-compaction.R'
+    'rho.agent-api-compaction.R'
+    'rho.agent-api.R'
+    'rho.ext-00-utils.R'
+    'rho.ext-01-extension.R'
+    'rho.ext-api.R'
+    'rho.compute-00-compute.R'
+    'rho.compute-api.R'
+    'rho.http.httr2-01-classes.R'
+    'rho.http.httr2-02-workers.R'
+    'rho.http.httr2-03-client.R'
+    'rho.http.httr2-api.R'
+    'rho.graphics-00-graphics.R'
+    'rho.graphics-api.R'
+    'rho.coding-00-tools.R'
+    'rho.coding-01-shell.R'
+    'rho.coding-02-r.R'
+    'rho.coding-03-session-jsonl.R'
+    'rho.coding-04-memory.R'
+    'rho.coding-05-interfaces.R'
+    'rho.coding-api-memory.R'
+    'rho.coding-api-session.R'
+    'rho.coding-api.R'
+    'rho.bio-00-utils.R'
+    'rho.bio-01-classes.R'
+    'rho.bio-02-constructors.R'
+    'rho.bio-03-manifest.R'
+    'rho.bio-api.R'
+    'rho.duckdb-00-duckdb.R'
+    'rho.duckdb-api.R'
+    'rho.bio.agent-00-bio-agent.R'
+    'rho.bio.agent-api.R'
+    'rho.testkit-00-testkit.R'
+    'zzz.R'
