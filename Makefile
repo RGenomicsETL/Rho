@@ -63,4 +63,4 @@ check-secrets:
 	$(RSCRIPT) scripts/check-secrets.R
 
 site:
-	$(RSCRIPT) scripts/build-site.R
+	scripts/build-site.sh

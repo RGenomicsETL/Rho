@@ -17,6 +17,6 @@
 ^VERSION$
 ^NEWS[.]md$
 ^air[.]toml$
-^_pkgdown[.]yml$
 ^.*[.]Rcheck$
 ^.*[.]tar[.]gz$
+^site$

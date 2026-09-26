@@ -37,7 +37,7 @@ check_readme <- function(path) {
   )
   if (length(relative_readme_links)) {
     record_error(sprintf(
-      "%s contains a relative README link that pkgdown rewrites incorrectly",
+      "%s contains a relative README link that breaks on the site",
       path
     ))
   }
