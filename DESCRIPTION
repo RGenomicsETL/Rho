@@ -18,7 +18,7 @@ Imports:
     grDevices, utils
 Suggests:
     DBI, duckdb, mirai, httr2, curl, tinytest, knitr, rmarkdown,
-    ggplot2, svglite, ragg
+    ggplot2, svglite, ragg, litedown
 Remotes:
     RGenomicsETL/nanonext@084c8eb82a35c38b2aaf7dd203414829c2bd8011
 URL: https://github.com/RGenomicsETL/Rho, https://rgenomicsetl.github.io/Rho/

@@ -10,3 +10,4 @@ pkgdown::build_site(
   preview = FALSE,
   override = list(destination = normalizePath("_site", mustWork = TRUE))
 )
+source("scripts/build-project-docs.R", local = TRUE)
