@@ -152,9 +152,9 @@ Three concrete Rho improvements are supported by this investigation:
    absent. Currently `rho_http_request()` always inserts 30000 ms, so a client
    configured for 1234 ms still produces a 30000 ms payload with a default
    request; see the [measured values](rho-timeout-inheritance-probe.json) and
-   [payload construction](../../../packages/rho.http/R/02-http.R). The nanonext
+   [payload construction](../../../R/rho.http-02-http.R). The nanonext
    streaming adapter applies the payload timeout to opening and each pull,
-   whereas [the httr2 worker](../../../packages/rho.http.httr2/R/02-workers.R) also
+   whereas [the httr2 worker](../../../R/rho.http.httr2-02-workers.R) also
    passes it as curl's total-transfer timeout. Those meanings can terminate
    long-lived SSE streams differently.
 
