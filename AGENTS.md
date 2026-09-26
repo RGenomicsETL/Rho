@@ -90,7 +90,7 @@ linked test, executable Rmd, or integration run.
 - The repository root is the `rho` package. `R/` contains the components;
   `inst/tinytest/rmd/` contains the authored test suite. Optional backends
   keep their external dependencies in `Suggests`.
-- Target R 4.4.0 or newer. Use modern base R directly; do not redefine `%||%`
+- Target R 4.6.0 or newer; older R has ABI differences we do not support. Use modern base R directly; do not redefine `%||%`
   or add compatibility shims for older R.
 - Do not create dot-prefixed pseudo-private functions or constants. Package
   namespaces already provide encapsulation. Standard package hooks such as

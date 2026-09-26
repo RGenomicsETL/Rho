@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        r: ['4.4', 'release']
+        r: ['release']
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
@@ -50,10 +50,10 @@ jobs:
           use-public-rspm: true
       - name: Install Air
         uses: posit-dev/setup-air@v1
-      - name: Install dependencies
-        run: |
-          Rscript -e 'install.packages("remotes")'
-          make deps
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::roxygen2, any::rcmdcheck
+          needs: check
       - name: Verify generated tests and style
         run: |
           make check-version

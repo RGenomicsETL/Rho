@@ -1,5 +1,6 @@
 # Rho 0.0.1.9001
 
+- Requires R 4.6.0 or newer; earlier R releases differ in ABI.
 - Distributes the async, HTTP, provider, agent, extension, compute, graphics,
   coding, and bioinformatics components as one top-level `rho` package with a
   unified test suite and optional backend dependencies.

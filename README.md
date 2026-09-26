@@ -147,7 +147,7 @@ substrate without defining it.
 
 ## Install and develop
 
-Rho targets R 4.4 or newer. Install the development package from a
+Rho targets R 4.6 or newer. Install the development package from a
 checkout. The required nanonext development build comes from the pinned
 [RGenomicsETL
 fork](https://github.com/RGenomicsETL/nanonext/tree/084c8eb82a35c38b2aaf7dd203414829c2bd8011),

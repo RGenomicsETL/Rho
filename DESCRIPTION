@@ -10,7 +10,7 @@ Description: Defines asynchronous tasks, streams, HTTP and provider protocols,
     graphics artifacts, and declared bioinformatics resources in one package.
 License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.4.0)
+Depends: R (>= 4.6.0)
 Roxygen: list(markdown = TRUE)
 Imports:
     S7, s7contract, nanonext (>= 1.10.2.9001), coro, later, promises,
