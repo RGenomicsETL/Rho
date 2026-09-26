@@ -62,6 +62,7 @@ jobs:
           make check-style
       - name: Verify generated documentation
         run: |
+          make install
           make rd
           make rdm
           git diff --exit-code
