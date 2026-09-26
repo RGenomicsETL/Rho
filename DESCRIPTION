@@ -23,7 +23,7 @@ Remotes:
     RGenomicsETL/nanonext@ee180dd55e6ec1f374aaa34bc85ff47170b0d167
 URL: https://github.com/RGenomicsETL/Rho, https://rgenomicsetl.github.io/Rho/
 BugReports: https://github.com/RGenomicsETL/Rho/issues
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.0
 Collate:
     'rho.async-00-utils.R'
     'rho.async-01-classes.R'

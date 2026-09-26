@@ -986,10 +986,14 @@ export(rho_zai_model)
 export(rho_zai_provider)
 export(rho_zai_request)
 importFrom(digest,digest)
-importFrom(promises,as.promise)
-importFrom(promises,catch)
-importFrom(promises,promise)
-importFrom(promises,then)
-importFrom(s7contract,interface_requirement)
-importFrom(s7contract,new_interface)
+importFrom(promises,
+  as.promise,
+  catch,
+  promise,
+  then
+)
+importFrom(s7contract,
+  interface_requirement,
+  new_interface
+)
 importFrom(utils,capture.output)
