@@ -5,7 +5,7 @@ RSCRIPT ?= Rscript
 
 # remotes honors the pinned fork in DESCRIPTION's Remotes field.
 deps:
-	$(RSCRIPT) -e 'remotes::install_deps(dependencies = TRUE)'
+	$(RSCRIPT) -e 'remotes::install_deps(dependencies = TRUE)' -e 'install.packages("roxygen2")'
 
 install:
 	$(R) CMD INSTALL .
