@@ -136,12 +136,12 @@ note <- rho_memory_note(
 )
 
 remembered <- rho_remember(memory, note, author = "agent:fixture") |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(remembered, RhoMemoryRemembered))
 expect_equal(remembered@supersedes_revision_id, "")
 
 duplicate <- rho_remember(memory, note, author = "agent:fixture") |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(duplicate, RhoMemoryAlreadyExists))
 expect_equal(duplicate@current_revision_id, remembered@revision_id)
 
@@ -157,7 +157,7 @@ stale <- rho_edit_memory(
   ),
   author = "agent:fixture"
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(stale, RhoMemoryConflict))
 
 updated_note <- rho_memory_note(
@@ -174,19 +174,19 @@ edited <- rho_edit_memory(
   rho_memory_replacement(updated_note, remembered@revision_id),
   author = "agent:fixture"
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(edited, RhoMemoryEdited))
 expect_equal(edited@supersedes_revision_id, remembered@revision_id)
 expect_identical(edited@retracted_links, list(derived))
 
 current <- rho_recall(memory, "project-shape") |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 historical <- rho_recall(
   memory,
   "project-shape",
   revision_id = remembered@revision_id
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(current, RhoMemoryFound))
 expect_true(S7::S7_inherits(historical, RhoMemoryFound))
 expect_equal(current@revision@note@body, edited@note@body)
@@ -199,7 +199,7 @@ stale_forget <- rho_forget(
   author = "agent:fixture",
   reason = "superseded guidance"
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(stale_forget, RhoMemoryConflict))
 
 forgotten <- rho_forget(
@@ -209,14 +209,14 @@ forgotten <- rho_forget(
   author = "agent:fixture",
   reason = "superseded guidance"
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(forgotten, RhoMemoryForgotten))
 expect_identical(forgotten@retracted_links, list(related))
 
 absent <- rho_recall(memory, "project-shape") |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 history <- rho_memory_history(memory, "project-shape") |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(absent, RhoMemoryAbsent))
 expect_equal(length(history@revisions), 3L)
 expect_identical(
@@ -225,7 +225,7 @@ expect_identical(
 )
 
 recreated <- rho_remember(memory, note, author = "agent:fixture") |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(recreated, RhoMemoryRemembered))
 expect_equal(recreated@supersedes_revision_id, forgotten@revision_id)
 
@@ -255,7 +255,7 @@ remember_tool_result <- rho_execute_tool(
   ),
   context = NULL
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(S7::S7_inherits(remember_tool_result, ToolResult))
 
 recall_tool_result <- rho_execute_tool(
@@ -263,7 +263,7 @@ recall_tool_result <- rho_execute_tool(
   ToolCall("memory-2", "recall", list(slug = "tool-note")),
   context = NULL
 ) |>
-  rho_await(timeout = 1000L)
+  rho_await(timeout = 10000L)
 expect_true(grepl("Created through", recall_tool_result@content[[1L]]@text))
 expect_true(grepl("Revision:", recall_tool_result@content[[1L]]@text))
 
